@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: quizelive_postgres_local
+    environment:
+      POSTGRES_USER: quizelive
+      POSTGRES_PASSWORD: quizelive
+      POSTGRES_DB: quizelive
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"
+    volumes:
+      - quizelive_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quizelive -d quizelive"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  quizelive_pg:

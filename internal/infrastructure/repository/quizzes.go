@@ -1,0 +1,114 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/polarizer700/quizelive-backend/internal/domain/entity"
+	"github.com/polarizer700/quizelive-backend/internal/domain/repository"
+	"github.com/polarizer700/quizelive-backend/internal/infrastructure/repository/sqlcdb"
+)
+
+type QuizRepository struct {
+	q *sqlcdb.Queries
+}
+
+func NewQuizRepository(pool *pgxpool.Pool) *QuizRepository {
+	return &QuizRepository{q: sqlcdb.New(pool)}
+}
+
+func (r *QuizRepository) Create(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error) {
+	row, err := r.q.CreateQuiz(ctx, sqlcdb.CreateQuizParams{
+		Title:       quiz.Title,
+		Description: quiz.Description,
+		OwnerID:     quiz.OwnerID,
+		Status:      string(quiz.Status),
+	})
+	if err != nil {
+		return entity.Quiz{}, mapDB(err)
+	}
+
+	return mapQuiz(row), nil
+}
+
+func (r *QuizRepository) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
+	row, err := r.q.GetQuiz(ctx, id)
+	if err != nil {
+		return entity.Quiz{}, mapDB(err)
+	}
+
+	return mapQuiz(row), nil
+}
+
+func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter) ([]entity.Quiz, int64, error) {
+	params := quizFilter(filter)
+
+	rows, err := r.q.ListQuizzes(ctx, sqlcdb.ListQuizzesParams{
+		OwnerID:   params.OwnerID,
+		Status:    params.Status,
+		RowLimit:  filter.Page.Limit,
+		RowOffset: filter.Page.Offset,
+	})
+	if err != nil {
+		return nil, 0, mapDB(err)
+	}
+
+	total, err := r.q.CountQuizzes(ctx, params)
+	if err != nil {
+		return nil, 0, mapDB(err)
+	}
+
+	quizzes := make([]entity.Quiz, 0, len(rows))
+	for _, row := range rows {
+		quizzes = append(quizzes, mapQuiz(row))
+	}
+
+	return quizzes, total, nil
+}
+
+func (r *QuizRepository) Update(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error) {
+	row, err := r.q.UpdateQuiz(ctx, sqlcdb.UpdateQuizParams{
+		ID:          quiz.ID,
+		Title:       quiz.Title,
+		Description: quiz.Description,
+		Status:      string(quiz.Status),
+	})
+	if err != nil {
+		return entity.Quiz{}, mapDB(err)
+	}
+
+	return mapQuiz(row), nil
+}
+
+func (r *QuizRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return mapDB(r.q.DeleteQuiz(ctx, id))
+}
+
+func quizFilter(filter repository.QuizFilter) sqlcdb.CountQuizzesParams {
+	params := sqlcdb.CountQuizzesParams{}
+	if filter.OwnerID != nil {
+		params.OwnerID = pgtype.UUID{Bytes: *filter.OwnerID, Valid: true}
+	}
+
+	if filter.Status != nil {
+		status := string(*filter.Status)
+		params.Status = &status
+	}
+
+	return params
+}
+
+func mapQuiz(row sqlcdb.Quiz) entity.Quiz {
+	return entity.Quiz{
+		ID:          row.ID,
+		Title:       row.Title,
+		Description: row.Description,
+		OwnerID:     row.OwnerID,
+		Status:      entity.QuizStatus(row.Status),
+		CreatedAt:   timeFrom(row.CreatedAt),
+		UpdatedAt:   timeFrom(row.UpdatedAt),
+	}
+}

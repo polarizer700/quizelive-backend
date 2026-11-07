@@ -1,0 +1,50 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+  settings:
+    depguard:
+      rules:
+        domain:
+          list-mode: original
+          files:
+            - "**/internal/domain/**/*.go"
+          deny:
+            - pkg: github.com/polarizer700/quizelive-backend/internal/app
+              desc: domain не зависит от app
+            - pkg: github.com/polarizer700/quizelive-backend/internal/infrastructure
+              desc: domain не зависит от infrastructure
+            - pkg: github.com/polarizer700/quizelive-backend/internal/transport
+              desc: domain не зависит от transport
+            - pkg: github.com/polarizer700/quizelive-backend/internal/commands
+              desc: domain не зависит от commands
+            - pkg: github.com/*
+              desc: во domain только стандартная библиотека и разрешённые исключения
+          allow:
+            - $gostd
+            - github.com/polarizer700/quizelive-backend/internal/domain
+            - github.com/google/uuid
+        app:
+          list-mode: original
+          files:
+            - "**/internal/app/**/*.go"
+          deny:
+            - pkg: github.com/polarizer700/quizelive-backend/internal/infrastructure
+              desc: app зависит от интерфейсов domain, не от реализаций
+            - pkg: github.com/polarizer700/quizelive-backend/internal/transport
+              desc: app не зависит от transport
+            - pkg: github.com/polarizer700/quizelive-backend/internal/commands
+              desc: app не зависит от commands
+  exclusions:
+    generated: lax
+    paths:
+      - internal/transport/http/openapi
+      - internal/infrastructure/repository/sqlcdb

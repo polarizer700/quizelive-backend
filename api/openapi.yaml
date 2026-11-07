@@ -1,0 +1,703 @@
+openapi: 3.0.3
+info:
+  title: QuizeLive Admin API
+  version: 0.1.0
+  description: |
+    REST API админки и ведущего. Access JWT передаётся в Authorization: Bearer.
+    Refresh-токен — cookie `quizelive_refresh` (HttpOnly, SameSite=Strict), в теле ответа его нет.
+servers:
+  - url: /
+paths:
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Сессия создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/auth/refresh:
+    post:
+      operationId: refresh
+      security: []
+      responses:
+        "200":
+          description: Пара токенов обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      security: []
+      responses:
+        "204":
+          description: Refresh-токен отозван
+  /api/v1/users:
+    get:
+      operationId: listUsers
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/users/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      operationId: getUser
+      responses:
+        "200":
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Пользователь обновлён
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteUser
+      responses:
+        "204":
+          description: Пользователь удалён
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/quizzes:
+    get:
+      operationId: listQuizzes
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuizStatus"
+      responses:
+        "200":
+          description: Список квизов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuizRequest"
+      responses:
+        "201":
+          description: Квиз создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/quizzes/{quizId}:
+    parameters:
+      - $ref: "#/components/parameters/QuizId"
+    get:
+      operationId: getQuiz
+      responses:
+        "200":
+          description: Квиз
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuizRequest"
+      responses:
+        "200":
+          description: Квиз обновлён
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteQuiz
+      responses:
+        "204":
+          description: Квиз удалён
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/quizzes/{quizId}/host-token:
+    post:
+      operationId: issueHostToken
+      parameters:
+        - $ref: "#/components/parameters/QuizId"
+      responses:
+        "200":
+          description: Короткий JWT для открытия комнаты на TV
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostToken"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/quizzes/{quizId}/questions:
+    parameters:
+      - $ref: "#/components/parameters/QuizId"
+    get:
+      operationId: listQuestions
+      responses:
+        "200":
+          description: Вопросы квиза
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Вопрос создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/quizzes/{quizId}/questions/reorder:
+    post:
+      operationId: reorderQuestions
+      parameters:
+        - $ref: "#/components/parameters/QuizId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderQuestionsRequest"
+      responses:
+        "200":
+          description: Новый порядок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/quizzes/{quizId}/questions/{questionId}:
+    parameters:
+      - $ref: "#/components/parameters/QuizId"
+      - $ref: "#/components/parameters/QuestionId"
+    get:
+      operationId: getQuestion
+      responses:
+        "200":
+          description: Вопрос
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Вопрос обновлён
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteQuestion
+      responses:
+        "204":
+          description: Вопрос удалён
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QuizId:
+      name: quizId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Unauthorized:
+      description: Нужна аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    NotFound:
+      description: Не найдено
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Conflict:
+      description: Конфликт
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [slug, message]
+          properties:
+            slug:
+              type: string
+            message:
+              type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              required: [slug, message]
+              properties:
+                slug:
+                  type: string
+                message:
+                  type: string
+    UserRole:
+      type: string
+      enum: [admin, editor, host]
+    QuizStatus:
+      type: string
+      enum: [draft, published]
+    QuestionType:
+      type: string
+      enum: [single, multiple, text]
+    User:
+      type: object
+      required: [id, email, role, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        created_at:
+          type: string
+          format: date-time
+    UserList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+          format: int64
+    CreateUserRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        role:
+          $ref: "#/components/schemas/UserRole"
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        role:
+          $ref: "#/components/schemas/UserRole"
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      required: [access_token, expires_in, user]
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Секунды до истечения access JWT
+        user:
+          $ref: "#/components/schemas/User"
+    Quiz:
+      type: object
+      required: [id, title, description, owner_id, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/QuizStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    QuizList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quiz"
+        total:
+          type: integer
+          format: int64
+    CreateQuizRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+    UpdateQuizRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        status:
+          $ref: "#/components/schemas/QuizStatus"
+    HostToken:
+      type: object
+      required: [token, expires_in]
+      properties:
+        token:
+          type: string
+        expires_in:
+          type: integer
+    AnswerOptionInput:
+      type: object
+      required: [text, is_correct]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 500
+        is_correct:
+          type: boolean
+    AnswerOption:
+      type: object
+      required: [id, position, text, is_correct]
+      properties:
+        id:
+          type: string
+          format: uuid
+        position:
+          type: integer
+        text:
+          type: string
+        is_correct:
+          type: boolean
+    QuestionInput:
+      type: object
+      required: [type, text, time_limit_sec, points]
+      properties:
+        type:
+          $ref: "#/components/schemas/QuestionType"
+        text:
+          type: string
+        time_limit_sec:
+          type: integer
+        points:
+          type: integer
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerOptionInput"
+        text_answers:
+          type: array
+          items:
+            type: string
+    Question:
+      type: object
+      required: [id, quiz_id, position, type, text, time_limit_sec, points, options, text_answers]
+      properties:
+        id:
+          type: string
+          format: uuid
+        quiz_id:
+          type: string
+          format: uuid
+        position:
+          type: integer
+        type:
+          $ref: "#/components/schemas/QuestionType"
+        text:
+          type: string
+        time_limit_sec:
+          type: integer
+        points:
+          type: integer
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerOption"
+        text_answers:
+          type: array
+          items:
+            type: string
+    ReorderQuestionsRequest:
+      type: object
+      required: [question_ids]
+      properties:
+        question_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+security:
+  - bearerAuth: []

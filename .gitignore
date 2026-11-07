@@ -1,0 +1,9 @@
+.env
+.postgres_data/
+bin/
+.sqlc/
+coverage.out
+*.exe
+.DS_Store
+.idea/
+.gocache/
