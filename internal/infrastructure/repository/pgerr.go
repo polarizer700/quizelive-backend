@@ -28,6 +28,10 @@ func mapDB(err error) error {
 				return &domain.ConflictError{Message: "email already exists"}
 			}
 
+			if pgErr.ConstraintName == "game_sessions_code_key" {
+				return domain.ErrCodeTaken
+			}
+
 			return &domain.ConflictError{Message: "conflict"}
 		case "23503":
 			return &domain.ConflictError{Message: "record is still referenced"}
@@ -39,6 +43,14 @@ func mapDB(err error) error {
 
 func pgTime(value time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: value, Valid: true}
+}
+
+func pgTimePtr(value *time.Time) pgtype.Timestamptz {
+	if value == nil {
+		return pgtype.Timestamptz{}
+	}
+
+	return pgTime(*value)
 }
 
 func timeFrom(value pgtype.Timestamptz) time.Time {

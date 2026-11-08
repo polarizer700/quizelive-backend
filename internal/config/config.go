@@ -12,6 +12,7 @@ import (
 type Config struct {
 	AppEnv         string        `env:"APP_ENV" envDefault:"local"`
 	HTTPAddr       string        `env:"HTTP_ADDR" envDefault:":8080"`
+	GameHTTPAddr   string        `env:"GAME_HTTP_ADDR" envDefault:":8087"`
 	DatabaseURL    string        `env:"DATABASE_URL,required"`
 	JWTSeed        string        `env:"JWT_ED25519_SEED,required"`
 	AccessTTL      time.Duration `env:"JWT_ACCESS_TTL" envDefault:"15m"`
@@ -19,6 +20,13 @@ type Config struct {
 	HostTTL        time.Duration `env:"JWT_HOST_TTL" envDefault:"2m"`
 	CookieSecure   bool          `env:"COOKIE_SECURE" envDefault:"false"`
 	CORSOriginsRaw []string      `env:"CORS_ORIGINS" envSeparator:","`
+	PublicAppURL   string        `env:"PUBLIC_APP_URL" envDefault:"http://127.0.0.1:5173"`
+	VerifyTTL      time.Duration `env:"EMAIL_VERIFY_TTL" envDefault:"24h"`
+	SMTPHost       string        `env:"SMTP_HOST"`
+	SMTPPort       string        `env:"SMTP_PORT" envDefault:"587"`
+	SMTPUsername   string        `env:"SMTP_USERNAME"`
+	SMTPPassword   string        `env:"SMTP_PASSWORD"`
+	MailFrom       string        `env:"MAIL_FROM" envDefault:"QuizeLive <noreply@quizelive.local>"`
 }
 
 func (c Config) CORSOrigins() []string {
@@ -44,7 +52,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_ED25519_SEED must be 32 bytes encoded as standard base64")
 	}
 
-	if cfg.AccessTTL <= 0 || cfg.RefreshTTL <= 0 || cfg.HostTTL <= 0 {
+	cfg.PublicAppURL = strings.TrimRight(strings.TrimSpace(cfg.PublicAppURL), "/")
+	if cfg.PublicAppURL == "" {
+		return nil, fmt.Errorf("PUBLIC_APP_URL is required")
+	}
+
+	if cfg.AccessTTL <= 0 || cfg.RefreshTTL <= 0 || cfg.HostTTL <= 0 || cfg.VerifyTTL <= 0 {
 		return nil, fmt.Errorf("token ttl must be positive")
 	}
 

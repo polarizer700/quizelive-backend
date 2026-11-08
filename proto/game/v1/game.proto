@@ -4,8 +4,8 @@ package quizelive.game.v1;
 
 option go_package = "github.com/polarizer700/quizelive-backend/gen/game/v1;gamev1";
 
-// Черновик кадра WebSocket между TV, телефоном и game-server.
-// Хаб и стейт-машина появляются на этапе 3.
+// Кадр WebSocket между телевизором, телефоном и game-server.
+// По проводу уходит JSON: одно поле конверта за сообщение.
 // Правильные ответы есть только в QuestionRevealed.
 
 message ClientEnvelope {
@@ -28,8 +28,13 @@ message ServerEnvelope {
     Leaderboard leaderboard = 6;
     GameFinished game_finished = 7;
     GameError error = 8;
+    PlayerSession player_session = 9;
   }
 }
+
+// Кадр по WebSocket — один JSON-объект с одним заполненным полем конверта.
+// Имена полей совпадают с proto. Правильные ответы есть только в question_revealed.
+// player_session уходит только тому телефону, который вошёл или переподключился.
 
 message CreateRoom {
   string host_token = 1;
@@ -66,6 +71,11 @@ message RoomState {
 
 message PlayerJoined {
   Player player = 1;
+}
+
+message PlayerSession {
+  string player_token = 1;
+  Player player = 2;
 }
 
 message QuestionOption {

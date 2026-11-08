@@ -55,6 +55,11 @@ func mapError(err error) (int, errorBody) {
 		return http.StatusBadRequest, body
 	}
 
+	var unverified *domain.EmailUnverifiedError
+	if errors.As(err, &unverified) {
+		return http.StatusForbidden, simpleError("EMAIL_NOT_VERIFIED", unverified.Error())
+	}
+
 	var conflict *domain.ConflictError
 	if errors.As(err, &conflict) {
 		return http.StatusConflict, simpleError("CONFLICT", conflict.Error())

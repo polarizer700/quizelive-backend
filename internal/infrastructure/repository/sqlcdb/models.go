@@ -17,6 +17,14 @@ type AnswerOption struct {
 	IsCorrect  bool
 }
 
+type EmailVerification struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+	UsedAt    pgtype.Timestamptz
+}
+
 type GameResult struct {
 	SessionID uuid.UUID
 	Nickname  string
@@ -68,9 +76,10 @@ type TextAnswer struct {
 }
 
 type User struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	Role         string
-	CreatedAt    pgtype.Timestamptz
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	CreatedAt       pgtype.Timestamptz
+	EmailVerifiedAt pgtype.Timestamptz
 }

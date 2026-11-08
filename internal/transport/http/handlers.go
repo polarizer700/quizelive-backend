@@ -54,6 +54,30 @@ func (s *Server) Logout(ctx context.Context, _ openapi.LogoutRequestObject) (ope
 	return openapi.Logout204Response{}, nil
 }
 
+func (s *Server) Register(ctx context.Context, request openapi.RegisterRequestObject) (openapi.RegisterResponseObject, error) {
+	if request.Body == nil {
+		return nil, errInvalidBody()
+	}
+
+	if err := s.auth.Register(ctx, string(request.Body.Email), request.Body.Password); err != nil {
+		return nil, err
+	}
+
+	return openapi.Register204Response{}, nil
+}
+
+func (s *Server) VerifyEmail(ctx context.Context, request openapi.VerifyEmailRequestObject) (openapi.VerifyEmailResponseObject, error) {
+	if request.Body == nil {
+		return nil, errInvalidBody()
+	}
+
+	if err := s.auth.VerifyEmail(ctx, request.Body.Token); err != nil {
+		return nil, err
+	}
+
+	return openapi.VerifyEmail204Response{}, nil
+}
+
 func (s *Server) ListUsers(ctx context.Context, request openapi.ListUsersRequestObject) (openapi.ListUsersResponseObject, error) {
 	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
 

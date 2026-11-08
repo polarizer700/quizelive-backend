@@ -9,7 +9,29 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const consumeEmailVerification = `-- name: ConsumeEmailVerification :one
+UPDATE email_verifications
+SET used_at = $2
+WHERE token_hash = $1
+  AND used_at IS NULL
+  AND expires_at > $2
+RETURNING user_id
+`
+
+type ConsumeEmailVerificationParams struct {
+	TokenHash []byte
+	UsedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ConsumeEmailVerification(ctx context.Context, arg ConsumeEmailVerificationParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, consumeEmailVerification, arg.TokenHash, arg.UsedAt)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
 
 const countUsers = `-- name: CountUsers :one
 SELECT count(*)::bigint AS total
@@ -24,28 +46,55 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash, role)
-VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, created_at
+INSERT INTO users (email, password_hash, role, email_verified_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, email, password_hash, role, email_verified_at, created_at
 `
 
 type CreateUserParams struct {
-	Email        string
-	PasswordHash string
-	Role         string
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.Role)
-	var i User
+type CreateUserRow struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+		arg.EmailVerifiedAt,
+	)
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Role,
+		&i.EmailVerifiedAt,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deletePendingVerifications = `-- name: DeletePendingVerifications :exec
+DELETE FROM email_verifications
+WHERE user_id = $1
+  AND used_at IS NULL
+`
+
+func (q *Queries) DeletePendingVerifications(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePendingVerifications, userID)
+	return err
 }
 
 const deleteUser = `-- name: DeleteUser :exec
@@ -58,46 +107,100 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const getEmailVerificationByHash = `-- name: GetEmailVerificationByHash :one
+SELECT user_id, used_at
+FROM email_verifications
+WHERE token_hash = $1
+`
+
+type GetEmailVerificationByHashRow struct {
+	UserID uuid.UUID
+	UsedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetEmailVerificationByHash(ctx context.Context, tokenHash []byte) (GetEmailVerificationByHashRow, error) {
+	row := q.db.QueryRow(ctx, getEmailVerificationByHash, tokenHash)
+	var i GetEmailVerificationByHashRow
+	err := row.Scan(&i.UserID, &i.UsedAt)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, created_at
+SELECT id, email, password_hash, role, email_verified_at, created_at
 FROM users
 WHERE email = $1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+type GetUserByEmailRow struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
-	var i User
+	var i GetUserByEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Role,
+		&i.EmailVerifiedAt,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, created_at
+SELECT id, email, password_hash, role, email_verified_at, created_at
 FROM users
 WHERE id = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+type GetUserByIDRow struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
-	var i User
+	var i GetUserByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Role,
+		&i.EmailVerifiedAt,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
+const insertEmailVerification = `-- name: InsertEmailVerification :exec
+INSERT INTO email_verifications (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3)
+`
+
+type InsertEmailVerificationParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) InsertEmailVerification(ctx context.Context, arg InsertEmailVerificationParams) error {
+	_, err := q.db.Exec(ctx, insertEmailVerification, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
+}
+
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, password_hash, role, created_at
+SELECT id, email, password_hash, role, email_verified_at, created_at
 FROM users
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
@@ -108,20 +211,30 @@ type ListUsersParams struct {
 	Offset int32
 }
 
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
+type ListUsersRow struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
 	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []ListUsersRow
 	for rows.Next() {
-		var i User
+		var i ListUsersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
 			&i.PasswordHash,
 			&i.Role,
+			&i.EmailVerifiedAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -134,13 +247,29 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const markUserEmailVerified = `-- name: MarkUserEmailVerified :exec
+UPDATE users
+SET email_verified_at = $2
+WHERE id = $1
+`
+
+type MarkUserEmailVerifiedParams struct {
+	ID              uuid.UUID
+	EmailVerifiedAt pgtype.Timestamptz
+}
+
+func (q *Queries) MarkUserEmailVerified(ctx context.Context, arg MarkUserEmailVerifiedParams) error {
+	_, err := q.db.Exec(ctx, markUserEmailVerified, arg.ID, arg.EmailVerifiedAt)
+	return err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET email = $2,
     password_hash = $3,
     role = $4
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at
+RETURNING id, email, password_hash, role, email_verified_at, created_at
 `
 
 type UpdateUserParams struct {
@@ -150,19 +279,29 @@ type UpdateUserParams struct {
 	Role         string
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+type UpdateUserRow struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            string
+	EmailVerifiedAt pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.ID,
 		arg.Email,
 		arg.PasswordHash,
 		arg.Role,
 	)
-	var i User
+	var i UpdateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Role,
+		&i.EmailVerifiedAt,
 		&i.CreatedAt,
 	)
 	return i, err

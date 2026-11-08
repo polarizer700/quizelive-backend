@@ -21,7 +21,7 @@ generate: sqlc openapi
 
 sqlc:
 	mkdir -p .sqlc
-	awk 'BEGIN { up = 1 } /^-- \+goose Down/ { up = 0 } up && $$0 !~ /^-- \+goose/ { print }' migrations/*.sql > .sqlc/schema.sql
+	awk 'BEGIN { up = 1 } /^-- \+goose Up/ { up = 1; next } /^-- \+goose Down/ { up = 0; next } up { print }' migrations/*.sql > .sqlc/schema.sql
 	$(TOOLS)/sqlc generate
 
 openapi:

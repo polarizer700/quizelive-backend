@@ -49,6 +49,38 @@ paths:
       responses:
         "204":
           description: Refresh-токен отозван
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "204":
+          description: Письмо со ссылкой отправлено
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/auth/verify-email:
+    post:
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "204":
+          description: Почта подтверждена
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /api/v1/users:
     get:
       operationId: listUsers
@@ -544,6 +576,24 @@ components:
           type: string
         password:
           type: string
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+    VerifyEmailRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
     AuthResponse:
       type: object
       required: [access_token, expires_in, user]

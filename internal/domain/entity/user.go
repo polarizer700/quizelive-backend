@@ -37,11 +37,12 @@ func (r Role) CanEditQuizzes() bool {
 }
 
 type User struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	Role         Role
-	CreatedAt    time.Time
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Role            Role
+	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time
 }
 
 func NormalizeEmail(raw string) (string, error) {

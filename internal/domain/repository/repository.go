@@ -15,12 +15,19 @@ type Page struct {
 }
 
 type UserRepository interface {
-	Create(ctx context.Context, email, passwordHash string, role entity.Role) (entity.User, error)
+	Create(ctx context.Context, email, passwordHash string, role entity.Role, verifiedAt *time.Time) (entity.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (entity.User, error)
 	GetByEmail(ctx context.Context, email string) (entity.User, error)
 	List(ctx context.Context, page Page) ([]entity.User, int64, error)
 	Update(ctx context.Context, user entity.User) (entity.User, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type EmailVerificationRepository interface {
+	// ReplacePending забывает старые неиспользованные ссылки и сохраняет новую.
+	ReplacePending(ctx context.Context, userID uuid.UUID, tokenHash []byte, expiresAt time.Time) error
+	// Consume помечает ссылку использованной и подтверждает почту пользователя.
+	Consume(ctx context.Context, tokenHash []byte, at time.Time) (uuid.UUID, error)
 }
 
 type RefreshToken struct {
@@ -51,6 +58,17 @@ type QuizRepository interface {
 	List(ctx context.Context, filter QuizFilter) ([]entity.Quiz, int64, error)
 	Update(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type GameResult struct {
+	Nickname string
+	Score    int
+	Rank     int
+}
+
+type GameSessionRepository interface {
+	Create(ctx context.Context, quizID, hostID uuid.UUID, code string) (uuid.UUID, error)
+	Finish(ctx context.Context, sessionID uuid.UUID, finishedAt time.Time, results []GameResult) error
 }
 
 type QuestionRepository interface {

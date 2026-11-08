@@ -73,6 +73,25 @@ func (m *TokenManager) IssueHost(user entity.User, quizID uuid.UUID) (string, ti
 	return token, m.hostTTL, nil
 }
 
+func (m *TokenManager) ParseHost(token string) (uuid.UUID, uuid.UUID, error) {
+	parsed, err := m.parse(token, audienceWS, useHost)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, domain.ErrUnauthorized
+	}
+
+	userID, err := uuid.Parse(parsed.Subject)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, domain.ErrUnauthorized
+	}
+
+	quizID, err := uuid.Parse(parsed.QuizID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, domain.ErrUnauthorized
+	}
+
+	return userID, quizID, nil
+}
+
 func (m *TokenManager) ParseAccess(token string) (identity.Identity, error) {
 	parsed, err := m.parse(token, audienceAPI, useAccess)
 	if err != nil {

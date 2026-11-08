@@ -8,6 +8,7 @@ var (
 	ErrForbidden    = errors.New("forbidden")
 	ErrConflict     = errors.New("conflict")
 	ErrInvalid      = errors.New("invalid")
+	ErrCodeTaken    = errors.New("room code taken")
 )
 
 // ConflictError сохраняет errors.Is(..., ErrConflict) и несёт текст для API.
@@ -25,6 +26,17 @@ func (e *ConflictError) Error() string {
 
 func (e *ConflictError) Unwrap() error {
 	return ErrConflict
+}
+
+// EmailUnverifiedError означает, что пароль верный, но почта ещё не подтверждена.
+type EmailUnverifiedError struct{}
+
+func (e *EmailUnverifiedError) Error() string {
+	return "email is not verified"
+}
+
+func (e *EmailUnverifiedError) Unwrap() error {
+	return ErrForbidden
 }
 
 // FieldError — ошибка одного поля.

@@ -18,6 +18,7 @@ import (
 	"github.com/polarizer700/quizelive-backend/internal/app/usecase"
 	"github.com/polarizer700/quizelive-backend/internal/config"
 	infraauth "github.com/polarizer700/quizelive-backend/internal/infrastructure/auth"
+	"github.com/polarizer700/quizelive-backend/internal/infrastructure/mail"
 	pgdb "github.com/polarizer700/quizelive-backend/internal/infrastructure/postgres"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/repository"
 	adminhttp "github.com/polarizer700/quizelive-backend/internal/transport/http"
@@ -170,7 +171,17 @@ func newAPI(t *testing.T, pool *pgxpool.Pool) http.Handler {
 	}
 
 	return adminhttp.NewServer(
-		usecase.NewAuth(repository.NewUserRepository(pool), repository.NewRefreshTokenRepository(pool), hasher, tokens, cfg.RefreshTTL),
+		usecase.NewAuth(
+			repository.NewUserRepository(pool),
+			repository.NewRefreshTokenRepository(pool),
+			repository.NewEmailVerificationRepository(pool),
+			hasher,
+			tokens,
+			mail.NewLogSender(),
+			cfg.RefreshTTL,
+			24*time.Hour,
+			"http://localhost:5173",
+		),
 		users,
 		usecase.NewQuizzes(repository.NewQuizRepository(pool), tokens),
 		usecase.NewQuestions(repository.NewQuizRepository(pool), repository.NewQuestionRepository(pool)),

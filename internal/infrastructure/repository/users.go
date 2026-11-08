@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/polarizer700/quizelive-backend/internal/domain/entity"
@@ -19,17 +21,18 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{q: sqlcdb.New(pool)}
 }
 
-func (r *UserRepository) Create(ctx context.Context, email, passwordHash string, role entity.Role) (entity.User, error) {
+func (r *UserRepository) Create(ctx context.Context, email, passwordHash string, role entity.Role, verifiedAt *time.Time) (entity.User, error) {
 	row, err := r.q.CreateUser(ctx, sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: passwordHash,
-		Role:         string(role),
+		Email:           email,
+		PasswordHash:    passwordHash,
+		Role:            string(role),
+		EmailVerifiedAt: pgTimePtr(verifiedAt),
 	})
 	if err != nil {
 		return entity.User{}, mapDB(err)
 	}
 
-	return mapUser(row), nil
+	return userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt), nil
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (entity.User, error) {
@@ -38,7 +41,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (entity.User
 		return entity.User{}, mapDB(err)
 	}
 
-	return mapUser(row), nil
+	return userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt), nil
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (entity.User, error) {
@@ -47,7 +50,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (entity.U
 		return entity.User{}, mapDB(err)
 	}
 
-	return mapUser(row), nil
+	return userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt), nil
 }
 
 func (r *UserRepository) List(ctx context.Context, page repository.Page) ([]entity.User, int64, error) {
@@ -63,7 +66,7 @@ func (r *UserRepository) List(ctx context.Context, page repository.Page) ([]enti
 
 	users := make([]entity.User, 0, len(rows))
 	for _, row := range rows {
-		users = append(users, mapUser(row))
+		users = append(users, userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt))
 	}
 
 	return users, total, nil
@@ -80,19 +83,20 @@ func (r *UserRepository) Update(ctx context.Context, user entity.User) (entity.U
 		return entity.User{}, mapDB(err)
 	}
 
-	return mapUser(row), nil
+	return userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt), nil
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return mapDB(r.q.DeleteUser(ctx, id))
 }
 
-func mapUser(row sqlcdb.User) entity.User {
+func userFrom(id uuid.UUID, email, passwordHash, role string, verifiedAt, createdAt pgtype.Timestamptz) entity.User {
 	return entity.User{
-		ID:           row.ID,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		Role:         entity.Role(row.Role),
-		CreatedAt:    timeFrom(row.CreatedAt),
+		ID:              id,
+		Email:           email,
+		PasswordHash:    passwordHash,
+		Role:            entity.Role(role),
+		EmailVerifiedAt: timePtr(verifiedAt),
+		CreatedAt:       timeFrom(createdAt),
 	}
 }

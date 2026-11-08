@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -185,7 +186,8 @@ func (u *Users) create(ctx context.Context, emailRaw, password string, role enti
 		return entity.User{}, err
 	}
 
-	user, err := u.users.Create(ctx, email, hash, role)
+	now := time.Now()
+	user, err := u.users.Create(ctx, email, hash, role, &now)
 	if err != nil {
 		return entity.User{}, err
 	}

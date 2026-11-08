@@ -114,7 +114,7 @@ func isPublic(r *http.Request) bool {
 	}
 
 	switch r.URL.Path {
-	case "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout":
+	case "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/register", "/api/v1/auth/verify-email":
 		return true
 	default:
 		return false
@@ -132,7 +132,7 @@ func rateLimitAuth(next http.Handler) http.Handler {
 	limited := httprate.LimitByIP(10, time.Minute)(next)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/refresh" {
+		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/refresh" || r.URL.Path == "/api/v1/auth/register" || r.URL.Path == "/api/v1/auth/verify-email" {
 			limited.ServeHTTP(w, r)
 			return
 		}

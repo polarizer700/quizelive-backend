@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/polarizer700/quizelive-backend/internal/domain"
@@ -23,28 +24,44 @@ type Session struct {
 }
 
 type Auth struct {
-	users      repository.UserRepository
-	tokens     repository.RefreshTokenRepository
-	hasher     auth.PasswordHasher
-	issuer     auth.TokenIssuer
-	refreshTTL time.Duration
-	now        func() time.Time
+	users         repository.UserRepository
+	tokens        repository.RefreshTokenRepository
+	verifications repository.EmailVerificationRepository
+	hasher        auth.PasswordHasher
+	issuer        auth.TokenIssuer
+	mailer        auth.Mailer
+	refreshTTL    time.Duration
+	verifyTTL     time.Duration
+	publicURL     string
+	now           func() time.Time
 }
 
 func NewAuth(
 	users repository.UserRepository,
 	tokens repository.RefreshTokenRepository,
+	verifications repository.EmailVerificationRepository,
 	hasher auth.PasswordHasher,
 	issuer auth.TokenIssuer,
+	mailer auth.Mailer,
 	refreshTTL time.Duration,
+	verifyTTL time.Duration,
+	publicURL string,
 ) *Auth {
+	if verifyTTL <= 0 {
+		verifyTTL = 24 * time.Hour
+	}
+
 	return &Auth{
-		users:      users,
-		tokens:     tokens,
-		hasher:     hasher,
-		issuer:     issuer,
-		refreshTTL: refreshTTL,
-		now:        time.Now,
+		users:         users,
+		tokens:        tokens,
+		verifications: verifications,
+		hasher:        hasher,
+		issuer:        issuer,
+		mailer:        mailer,
+		refreshTTL:    refreshTTL,
+		verifyTTL:     verifyTTL,
+		publicURL:     strings.TrimRight(publicURL, "/"),
+		now:           time.Now,
 	}
 }
 
@@ -73,7 +90,79 @@ func (a *Auth) Login(ctx context.Context, emailRaw, password string) (Session, e
 		return Session{}, cmpErr
 	}
 
+	if user.EmailVerifiedAt == nil {
+		return Session{}, &domain.EmailUnverifiedError{}
+	}
+
 	return a.startSession(ctx, user)
+}
+
+func (a *Auth) Register(ctx context.Context, emailRaw, password string) error {
+	email, err := entity.NormalizeEmail(emailRaw)
+	if err != nil {
+		return err
+	}
+
+	if err = entity.ValidatePassword(password); err != nil {
+		return err
+	}
+
+	hash, err := a.hasher.Hash(password)
+	if err != nil {
+		return err
+	}
+
+	user, err := a.users.GetByEmail(ctx, email)
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		user, err = a.users.Create(ctx, email, hash, entity.RoleEditor, nil)
+	case err != nil:
+		return err
+	case user.EmailVerifiedAt != nil:
+		return &domain.ConflictError{Message: "email already exists"}
+	default:
+		user.PasswordHash = hash
+		user, err = a.users.Update(ctx, user)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	raw, tokenHash, err := newSecret()
+	if err != nil {
+		return err
+	}
+
+	if err = a.verifications.ReplacePending(ctx, user.ID, tokenHash, a.now().Add(a.verifyTTL)); err != nil {
+		return err
+	}
+
+	link := a.publicURL + "/verify-email?token=" + raw
+	text := "Подтвердите почту, чтобы войти в QuizeLive:\n\n" + link + "\n\nСсылка действует 24 часа. Если вы не регистрировались, проигнорируйте письмо."
+
+	return a.mailer.Send(ctx, auth.Message{
+		To:      email,
+		Subject: "Подтвердите почту QuizeLive",
+		Text:    text,
+	})
+}
+
+func (a *Auth) VerifyEmail(ctx context.Context, rawToken string) error {
+	rawToken = strings.TrimSpace(rawToken)
+	if rawToken == "" {
+		return domain.FieldErrorf("token", "invalid", "token is invalid or expired")
+	}
+
+	if _, err := a.verifications.Consume(ctx, hashRefresh(rawToken), a.now()); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.FieldErrorf("token", "invalid", "token is invalid or expired")
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (a *Auth) Refresh(ctx context.Context, rawToken string) (Session, error) {
@@ -184,14 +273,23 @@ func (a *Auth) accessSession(user entity.User, refresh string, refreshExpires ti
 }
 
 func (a *Auth) newRefresh(now time.Time) (string, []byte, time.Time, error) {
+	raw, sum, err := newSecret()
+	if err != nil {
+		return "", nil, time.Time{}, err
+	}
+
+	return raw, sum, now.Add(a.refreshTTL), nil
+}
+
+func newSecret() (string, []byte, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
-		return "", nil, time.Time{}, err
+		return "", nil, err
 	}
 
 	raw := base64.RawURLEncoding.EncodeToString(buf)
 
-	return raw, hashRefresh(raw), now.Add(a.refreshTTL), nil
+	return raw, hashRefresh(raw), nil
 }
 
 func hashRefresh(raw string) []byte {
