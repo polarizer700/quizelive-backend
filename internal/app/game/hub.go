@@ -34,8 +34,9 @@ type Hub struct {
 }
 
 type mailbox struct {
-	code string
-	in   chan inbound
+	code     string
+	in       chan inbound
+	finished bool
 }
 
 func NewHub(loader *Loader, sessions repository.GameSessionRepository) *Hub {
@@ -68,7 +69,7 @@ func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 
 	key := hostID.String() + ":" + quizID.String()
 	h.mu.Lock()
-	if existing := h.byHost[key]; existing != nil {
+	if existing := h.byHost[key]; existing != nil && !existing.finished {
 		h.mu.Unlock()
 		existing.in <- inbound{
 			sub: sub,
@@ -76,6 +77,7 @@ func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 		}
 		return
 	}
+	delete(h.byHost, key)
 
 	box := &mailbox{in: make(chan inbound, 64)}
 	h.byHost[key] = box
@@ -180,6 +182,9 @@ func (h *Hub) run(box *mailbox, room *game.Room) {
 
 			emit(subs, delivery)
 			if delivery.Finished != nil {
+				h.mu.Lock()
+				box.finished = true
+				h.mu.Unlock()
 				h.persist(room, delivery.Finished)
 			}
 		}
