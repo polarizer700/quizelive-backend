@@ -52,7 +52,15 @@ func NewHub(loader *Loader, sessions repository.GameSessionRepository) *Hub {
 func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 	h.mu.Lock()
 	if existing := h.byResume[hostToken]; existing != nil {
+		finished := existing.finished
 		h.mu.Unlock()
+		if finished {
+			sub.Send(game.Envelope{Error: &game.GameError{
+				Code:    "ROOM_FINISHED",
+				Message: "игра уже закончилась — выпустите новый токен ведущего",
+			}})
+			return
+		}
 		existing.in <- inbound{
 			sub: sub,
 			cmd: game.Command{Kind: game.CommandHost, ConnID: sub.ID(), Now: time.Now()},
@@ -69,15 +77,11 @@ func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 
 	key := hostID.String() + ":" + quizID.String()
 	h.mu.Lock()
-	if existing := h.byHost[key]; existing != nil && !existing.finished {
-		h.mu.Unlock()
-		existing.in <- inbound{
-			sub: sub,
-			cmd: game.Command{Kind: game.CommandHost, ConnID: sub.ID(), Now: time.Now()},
-		}
-		return
+	// Новый host-JWT всегда открывает новую комнату. Переподключение экрана идёт через resume.
+	if existing := h.byHost[key]; existing != nil {
+		h.detachLocked(existing)
+		delete(h.byHost, key)
 	}
-	delete(h.byHost, key)
 
 	box := &mailbox{in: make(chan inbound, 64)}
 	h.byHost[key] = box
@@ -164,6 +168,17 @@ func (h *Hub) box(code string) *mailbox {
 	defer h.mu.Unlock()
 
 	return h.rooms[code]
+}
+
+func (h *Hub) detachLocked(box *mailbox) {
+	for token, candidate := range h.byResume {
+		if candidate == box {
+			delete(h.byResume, token)
+		}
+	}
+	if box.code != "" {
+		delete(h.rooms, box.code)
+	}
 }
 
 func (h *Hub) run(box *mailbox, room *game.Room) {

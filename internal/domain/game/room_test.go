@@ -106,6 +106,42 @@ func TestTextAnswerAndReconnect(t *testing.T) {
 	}
 }
 
+func TestPacingSkipsBoardBetweenCheckpoints(t *testing.T) {
+	now := time.Date(2026, 11, 9, 21, 0, 0, 0, time.UTC)
+	questions := make([]Question, 4)
+	for i := range questions {
+		questions[i] = Question{
+			ID:     uuid.NewString(),
+			Type:   entity.QuestionTypeSingle,
+			Text:   "Q",
+			Limit:  time.Second,
+			Points: 10,
+			Options: []Option{
+				{ID: "a", Text: "A", IsCorrect: true},
+				{ID: "b", Text: "B"},
+			},
+		}
+	}
+	room := NewRoom("1111", uuid.New(), uuid.New(), questions)
+	room.Apply(Command{Kind: CommandHost, ConnID: "tv", Now: now})
+	room.Apply(Command{Kind: CommandJoin, ConnID: "phone", Nickname: "Аня", Now: now})
+	room.Apply(Command{Kind: CommandStart, ConnID: "tv", Now: now})
+
+	// After Q1 of 4: half is 2, so no mid-board — jump to Q2.
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(time.Second)}) // reveal
+	after := room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(5 * time.Second)})
+	if room.Phase != PhaseQuestion || room.Index != 1 {
+		t.Fatalf("expected Q2 after reveal, phase=%s index=%d deliveries=%d", room.Phase, room.Index, len(after))
+	}
+
+	// After Q2 of 4: mid-board.
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(6 * time.Second)}) // reveal
+	board := room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(10 * time.Second)})
+	if room.Phase != PhaseLeaderboard {
+		t.Fatalf("expected mid-board, phase=%s deliveries=%d", room.Phase, len(board))
+	}
+}
+
 func TestSpeedBonusShrinks(t *testing.T) {
 	limit := 20 * time.Second
 	if got := Points(100, true, 0, limit); got != 100 {

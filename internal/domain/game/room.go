@@ -20,6 +20,8 @@ const (
 	PhaseLeaderboard = "leaderboard"
 	PhaseFinished    = "finished"
 	maxPlayers       = 100
+	RevealHold       = 4 * time.Second
+	BoardHold        = 5 * time.Second
 )
 
 type Phase string
@@ -322,25 +324,29 @@ func (r *Room) next(cmd Command) []Delivery {
 	case PhaseQuestion:
 		return r.reveal(cmd.Now)
 	case PhaseReveal:
-		return r.showBoard()
+		return r.afterReveal(cmd.Now)
 	case PhaseLeaderboard:
-		r.Index++
-		if r.Index >= len(r.Questions) {
-			return r.finish()
-		}
-
-		return r.openQuestion(cmd.Now)
+		return r.afterBoard(cmd.Now)
 	default:
 		return []Delivery{{ConnID: cmd.ConnID, Msg: errorEnvelope("BAD_PHASE", "сейчас нечего переключать")}}
 	}
 }
 
 func (r *Room) tick(cmd Command) []Delivery {
-	if r.Phase != PhaseQuestion || cmd.Now.Before(r.deadline) {
+	if cmd.Now.Before(r.deadline) {
 		return nil
 	}
 
-	return r.reveal(cmd.Now)
+	switch r.Phase {
+	case PhaseQuestion:
+		return r.reveal(cmd.Now)
+	case PhaseReveal:
+		return r.afterReveal(cmd.Now)
+	case PhaseLeaderboard:
+		return r.afterBoard(cmd.Now)
+	default:
+		return nil
+	}
 }
 
 func (r *Room) openQuestion(now time.Time) []Delivery {
@@ -357,7 +363,7 @@ func (r *Room) openQuestion(now time.Time) []Delivery {
 	}
 }
 
-func (r *Room) reveal(time.Time) []Delivery {
+func (r *Room) reveal(now time.Time) []Delivery {
 	question := r.Questions[r.Index]
 	for _, item := range r.Players {
 		submission, ok := r.answers[item.ID]
@@ -369,22 +375,52 @@ func (r *Room) reveal(time.Time) []Delivery {
 	}
 
 	r.Phase = PhaseReveal
+	r.deadline = now.Add(RevealHold)
 	revealed := question.reveal()
 
 	return []Delivery{
 		{Disarm: true},
 		{All: true, Msg: Envelope{QuestionRevealed: &revealed}},
-		{All: true, Msg: r.stateEnvelope()},
+		{All: true, Msg: r.stateEnvelope(), ArmTimer: true, Deadline: r.deadline},
 	}
 }
 
-func (r *Room) showBoard() []Delivery {
+func (r *Room) afterReveal(now time.Time) []Delivery {
+	total := len(r.Questions)
+	questionNumber := r.Index + 1
+	if r.Index >= total-1 || ShouldShowMidBoard(questionNumber, total) {
+		return r.showBoard(now)
+	}
+
+	return r.advance(now)
+}
+
+func (r *Room) afterBoard(now time.Time) []Delivery {
+	if r.Index >= len(r.Questions)-1 {
+		return r.finish()
+	}
+
+	return r.advance(now)
+}
+
+func (r *Room) advance(now time.Time) []Delivery {
+	r.Index++
+	if r.Index >= len(r.Questions) {
+		return r.finish()
+	}
+
+	return r.openQuestion(now)
+}
+
+func (r *Room) showBoard(now time.Time) []Delivery {
 	r.Phase = PhaseLeaderboard
+	r.deadline = now.Add(BoardHold)
 	board := Leaderboard{Entries: r.ranked()}
 
 	return []Delivery{
+		{Disarm: true},
 		{All: true, Msg: r.stateEnvelope()},
-		{All: true, Msg: Envelope{Leaderboard: &board}},
+		{All: true, Msg: Envelope{Leaderboard: &board}, ArmTimer: true, Deadline: r.deadline},
 	}
 }
 
