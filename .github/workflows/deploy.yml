@@ -1,0 +1,52 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries (linux/amd64)
+        run: |
+          mkdir -p deploy
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o deploy/admin-api ./cmd/admin-api
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o deploy/game-server ./cmd/game-server
+
+      - name: Setup SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' '${{ secrets.VPS_SSH_KEY }}' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H '${{ secrets.VPS_HOST }}' >> ~/.ssh/known_hosts
+
+      - name: Upload binaries to staging dir
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -rf /opt/quizelive/bin.new && mkdir -p /opt/quizelive/bin.new'
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" deploy/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/bin.new/
+
+      - name: Activate, migrate and restart services
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+            set -e
+            install -m 750 -o root -g quizelive /opt/quizelive/bin.new/admin-api /opt/quizelive/bin/admin-api
+            install -m 750 -o root -g quizelive /opt/quizelive/bin.new/game-server /opt/quizelive/bin/game-server
+            rm -rf /opt/quizelive/bin.new
+            set -a; . /etc/quizelive.env; set +a
+            /opt/quizelive/bin/admin-api migrate
+            systemctl restart quizelive-admin quizelive-game
+            sleep 3
+            systemctl is-active quizelive-admin quizelive-game
+          '
