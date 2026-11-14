@@ -35,15 +35,19 @@ type AnswerOption struct {
 }
 
 type Question struct {
-	ID           uuid.UUID
-	QuizID       uuid.UUID
-	Position     int
-	Type         QuestionType
-	Text         string
-	TimeLimitSec int
-	Points       int
-	Options      []AnswerOption
-	TextAnswers  []string
+	ID               uuid.UUID
+	QuizID           uuid.UUID
+	Position         int
+	Type             QuestionType
+	Text             string
+	TimeLimitSec     int
+	Points           int
+	Options          []AnswerOption
+	TextAnswers      []string
+	ImageKey         string
+	ImageContentType string
+	ImageSizeBytes   int64
+	ImageURL         string
 }
 
 // NormalizeTextAnswer приводит вписываемый ответ к виду, в котором он хранится и сравнивается.

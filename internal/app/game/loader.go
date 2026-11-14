@@ -2,10 +2,12 @@ package gameapp
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/polarizer700/quizelive-backend/internal/config"
 	"github.com/polarizer700/quizelive-backend/internal/domain"
 	"github.com/polarizer700/quizelive-backend/internal/domain/auth"
 	"github.com/polarizer700/quizelive-backend/internal/domain/entity"
@@ -21,10 +23,11 @@ type Catalog struct {
 }
 
 type Loader struct {
-	parser    auth.HostTokenParser
-	quizzes   repository.QuizRepository
-	questions repository.QuestionRepository
-	sessions  repository.GameSessionRepository
+	parser         auth.HostTokenParser
+	quizzes        repository.QuizRepository
+	questions      repository.QuestionRepository
+	sessions       repository.GameSessionRepository
+	mediaPublicURL string
 }
 
 func NewLoader(
@@ -32,8 +35,15 @@ func NewLoader(
 	quizzes repository.QuizRepository,
 	questions repository.QuestionRepository,
 	sessions repository.GameSessionRepository,
+	cfg *config.Config,
 ) *Loader {
-	return &Loader{parser: parser, quizzes: quizzes, questions: questions, sessions: sessions}
+	return &Loader{
+		parser:         parser,
+		quizzes:        quizzes,
+		questions:      questions,
+		sessions:       sessions,
+		mediaPublicURL: strings.TrimRight(cfg.MediaPublicURL, "/"),
+	}
 }
 
 func (l *Loader) Identify(ctx context.Context, hostToken string) (uuid.UUID, uuid.UUID, error) {
@@ -87,11 +97,11 @@ func (l *Loader) Open(ctx context.Context, hostToken, code string) (Catalog, err
 		QuizID:    quiz.ID,
 		HostID:    hostID,
 		SessionID: sessionID,
-		Questions: snapshot(rows),
+		Questions: l.snapshot(rows),
 	}, nil
 }
 
-func snapshot(rows []entity.Question) []game.Question {
+func (l *Loader) snapshot(rows []entity.Question) []game.Question {
 	out := make([]game.Question, 0, len(rows))
 	for _, row := range rows {
 		options := make([]game.Option, 0, len(row.Options))
@@ -104,15 +114,27 @@ func snapshot(rows []entity.Question) []game.Question {
 		}
 
 		out = append(out, game.Question{
-			ID:      row.ID.String(),
-			Type:    row.Type,
-			Text:    row.Text,
-			Limit:   time.Duration(row.TimeLimitSec) * time.Second,
-			Points:  row.Points,
-			Options: options,
-			Answers: append([]string(nil), row.TextAnswers...),
+			ID:       row.ID.String(),
+			Type:     row.Type,
+			Text:     row.Text,
+			Limit:    time.Duration(row.TimeLimitSec) * time.Second,
+			Points:   row.Points,
+			Options:  options,
+			Answers:  append([]string(nil), row.TextAnswers...),
+			ImageURL: mediaURL(l.mediaPublicURL, row.ImageKey, row.ImageURL),
 		})
 	}
 
 	return out
+}
+
+func mediaURL(base, key, existing string) string {
+	if existing != "" {
+		return existing
+	}
+	if base == "" || key == "" {
+		return ""
+	}
+
+	return base + "/" + strings.TrimPrefix(key, "/")
 }

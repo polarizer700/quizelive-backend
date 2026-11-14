@@ -27,6 +27,8 @@ type Config struct {
 	SMTPUsername   string        `env:"SMTP_USERNAME"`
 	SMTPPassword   string        `env:"SMTP_PASSWORD"`
 	MailFrom       string        `env:"MAIL_FROM" envDefault:"QuizeLive <noreply@quizelive.local>"`
+	MediaDir       string        `env:"MEDIA_DIR" envDefault:"./.media"`
+	MediaPublicURL string        `env:"MEDIA_PUBLIC_URL" envDefault:"http://127.0.0.1:8086/media"`
 }
 
 func (c Config) CORSOrigins() []string {

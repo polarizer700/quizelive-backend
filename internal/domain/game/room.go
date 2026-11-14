@@ -22,6 +22,8 @@ const (
 	maxPlayers       = 100
 	RevealHold       = 4 * time.Second
 	BoardHold        = 5 * time.Second
+	AllAnsweredMin   = 3 * time.Second
+	AllAnsweredGrace = 2 * time.Second
 )
 
 type Phase string
@@ -33,13 +35,14 @@ type Option struct {
 }
 
 type Question struct {
-	ID      string
-	Type    entity.QuestionType
-	Text    string
-	Limit   time.Duration
-	Points  int
-	Options []Option
-	Answers []string
+	ID       string
+	Type     entity.QuestionType
+	Text     string
+	Limit    time.Duration
+	Points   int
+	Options  []Option
+	Answers  []string
+	ImageURL string
 }
 
 type Result struct {
@@ -309,10 +312,32 @@ func (r *Room) answer(cmd Command) []Delivery {
 		Elapsed:   cmd.Now.Sub(r.started),
 	}
 
-	return []Delivery{{
+	out := []Delivery{{
 		ConnID: cmd.ConnID,
 		Msg:    Envelope{AnswerAccepted: &AnswerAccepted{QuestionID: current.ID}},
 	}}
+
+	if r.allConnectedAnswered() {
+		earliest := r.started.Add(AllAnsweredMin)
+		soon := cmd.Now.Add(AllAnsweredGrace)
+		next := earliest
+		if soon.After(next) {
+			next = soon
+		}
+		if next.Before(r.deadline) {
+			r.deadline = next
+		}
+	}
+
+	progress := r.answersProgress()
+	out = append(out, Delivery{
+		All:      true,
+		Msg:      Envelope{AnswersProgress: &progress},
+		ArmTimer: true,
+		Deadline: r.deadline,
+	})
+
+	return out
 }
 
 func (r *Room) next(cmd Command) []Delivery {
@@ -456,6 +481,11 @@ func (r *Room) replay(connID string) []Delivery {
 		out = append(out, Delivery{ConnID: connID, Msg: Envelope{QuestionStarted: &view}})
 	}
 
+	if r.Phase == PhaseQuestion {
+		progress := r.answersProgress()
+		out = append(out, Delivery{ConnID: connID, Msg: Envelope{AnswersProgress: &progress}})
+	}
+
 	if r.Phase == PhaseReveal {
 		revealed := r.Questions[r.Index].reveal()
 		out = append(out, Delivery{ConnID: connID, Msg: Envelope{QuestionRevealed: &revealed}})
@@ -489,6 +519,51 @@ func (r *Room) playerByConn(connID string) *player {
 	}
 
 	return nil
+}
+
+func (r *Room) connectedPlayers() []*player {
+	out := make([]*player, 0, len(r.Players))
+	for _, item := range r.Players {
+		if item.Connected {
+			out = append(out, item)
+		}
+	}
+
+	return out
+}
+
+func (r *Room) allConnectedAnswered() bool {
+	connected := r.connectedPlayers()
+	if len(connected) == 0 {
+		return false
+	}
+
+	for _, item := range connected {
+		if _, ok := r.answers[item.ID]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *Room) answersProgress() AnswersProgress {
+	connected := r.connectedPlayers()
+	ids := make([]string, 0, len(connected))
+	for _, item := range connected {
+		if _, ok := r.answers[item.ID]; ok {
+			ids = append(ids, item.ID)
+		}
+	}
+	slices.Sort(ids)
+
+	return AnswersProgress{
+		QuestionID:     r.Questions[r.Index].ID,
+		Answered:       len(ids),
+		Total:          len(connected),
+		AnsweredIDs:    ids,
+		DeadlineUnixMs: r.deadline.UnixMilli(),
+	}
 }
 
 func (r *Room) ranked() []LeaderboardEntry {
@@ -532,6 +607,7 @@ func (q Question) public(index, total int, deadline time.Time) QuestionStarted {
 		Type:           string(q.Type),
 		TimeLimitSec:   int(q.Limit / time.Second),
 		Options:        options,
+		ImageURL:       q.ImageURL,
 		DeadlineUnixMs: deadline.UnixMilli(),
 	}
 }

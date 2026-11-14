@@ -17,8 +17,10 @@ import (
 
 	"github.com/polarizer700/quizelive-backend/internal/app/usecase"
 	"github.com/polarizer700/quizelive-backend/internal/config"
+	"github.com/polarizer700/quizelive-backend/internal/domain/media"
 	infraauth "github.com/polarizer700/quizelive-backend/internal/infrastructure/auth"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/mail"
+	inframedia "github.com/polarizer700/quizelive-backend/internal/infrastructure/media"
 	pgdb "github.com/polarizer700/quizelive-backend/internal/infrastructure/postgres"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/repository"
 	adminhttp "github.com/polarizer700/quizelive-backend/internal/transport/http"
@@ -184,11 +186,26 @@ func newAPI(t *testing.T, pool *pgxpool.Pool) http.Handler {
 		),
 		users,
 		usecase.NewQuizzes(repository.NewQuizRepository(pool), tokens),
-		usecase.NewQuestions(repository.NewQuizRepository(pool), repository.NewQuestionRepository(pool)),
+		usecase.NewQuestions(
+			repository.NewQuizRepository(pool),
+			repository.NewQuestionRepository(pool),
+			mustDiskStore(t),
+		),
 		tokens,
 		false,
 		[]string{"http://localhost"},
+		t.TempDir(),
+		true,
 	).Handler()
+}
+
+func mustDiskStore(t *testing.T) media.Store {
+	t.Helper()
+	store, err := inframedia.NewDiskStore(t.TempDir(), "http://127.0.0.1:8086/media")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return store
 }
 
 func doJSON(t *testing.T, client *http.Client, method, url, access string, body any, dest any) int {

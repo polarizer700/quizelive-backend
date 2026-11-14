@@ -142,6 +142,56 @@ func TestPacingSkipsBoardBetweenCheckpoints(t *testing.T) {
 	}
 }
 
+func TestAnswersProgressAndSoftClose(t *testing.T) {
+	room := sampleRoom()
+	now := time.Date(2026, 11, 14, 15, 0, 0, 0, time.UTC)
+	room.Apply(Command{Kind: CommandHost, ConnID: "tv", Now: now})
+	room.Apply(Command{Kind: CommandJoin, ConnID: "phone", Nickname: "Аня", Now: now})
+	room.Apply(Command{Kind: CommandJoin, ConnID: "phone-2", Nickname: "Боря", Now: now})
+	room.Apply(Command{Kind: CommandStart, ConnID: "tv", Now: now})
+	original := room.deadline
+
+	first := room.Apply(Command{
+		Kind:       CommandAnswer,
+		ConnID:     "phone",
+		QuestionID: "q1",
+		OptionIDs:  []string{"paris"},
+		Now:        now.Add(time.Second),
+	})
+	var progress *AnswersProgress
+	for _, delivery := range first {
+		if delivery.Msg.AnswersProgress != nil {
+			progress = delivery.Msg.AnswersProgress
+		}
+	}
+	if progress == nil || progress.Answered != 1 || progress.Total != 2 {
+		t.Fatalf("progress after first = %+v", progress)
+	}
+	if !room.deadline.Equal(original) {
+		t.Fatalf("deadline moved too early: %v vs %v", room.deadline, original)
+	}
+
+	second := room.Apply(Command{
+		Kind:       CommandAnswer,
+		ConnID:     "phone-2",
+		QuestionID: "q1",
+		OptionIDs:  []string{"lyon"},
+		Now:        now.Add(4 * time.Second),
+	})
+	for _, delivery := range second {
+		if delivery.Msg.AnswersProgress != nil {
+			progress = delivery.Msg.AnswersProgress
+		}
+	}
+	if progress == nil || progress.Answered != 2 || progress.Total != 2 {
+		t.Fatalf("progress after all = %+v", progress)
+	}
+	want := now.Add(6 * time.Second)
+	if !room.deadline.Equal(want) {
+		t.Fatalf("soft deadline = %v, want %v", room.deadline, want)
+	}
+}
+
 func TestSpeedBonusShrinks(t *testing.T) {
 	limit := 20 * time.Second
 	if got := Points(100, true, 0, limit); got != 100 {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/polarizer700/quizelive-backend/internal/domain"
@@ -105,12 +106,114 @@ func (r *QuestionRepository) ListByQuiz(ctx context.Context, quizID uuid.UUID) (
 		answersByQuestion[answer.QuestionID] = append(answersByQuestion[answer.QuestionID], answer.NormalizedValue)
 	}
 
+	images, err := r.loadImages(ctx, quizID)
+	if err != nil {
+		return nil, err
+	}
+
 	out := make([]entity.Question, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, assemble(row, optionsByQuestion[row.ID], answersByQuestion[row.ID]))
+		question := assemble(row, optionsByQuestion[row.ID], answersByQuestion[row.ID])
+		if image, ok := images[row.ID]; ok {
+			question.ImageKey = image.Key
+			question.ImageContentType = image.ContentType
+			question.ImageSizeBytes = image.Size
+		}
+		out = append(out, question)
 	}
 
 	return out, nil
+}
+
+type questionImage struct {
+	Key         string
+	ContentType string
+	Size        int64
+}
+
+func (r *QuestionRepository) loadImages(ctx context.Context, quizID uuid.UUID) (map[uuid.UUID]questionImage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, image_key, image_content_type, image_size_bytes
+		FROM questions
+		WHERE quiz_id = $1
+		  AND image_key IS NOT NULL
+	`, quizID)
+	if err != nil {
+		return nil, mapDB(err)
+	}
+	defer rows.Close()
+
+	out := map[uuid.UUID]questionImage{}
+	for rows.Next() {
+		var id uuid.UUID
+		var key, contentType *string
+		var size *int64
+		if err := rows.Scan(&id, &key, &contentType, &size); err != nil {
+			return nil, mapDB(err)
+		}
+		if key == nil || contentType == nil || size == nil {
+			continue
+		}
+		out[id] = questionImage{Key: *key, ContentType: *contentType, Size: *size}
+	}
+
+	return out, mapDB(rows.Err())
+}
+
+func (r *QuestionRepository) SetImage(ctx context.Context, quizID, questionID uuid.UUID, key, contentType string, size int64) (entity.Question, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE questions
+		SET image_key = $3,
+		    image_content_type = $4,
+		    image_size_bytes = $5
+		WHERE id = $1
+		  AND quiz_id = $2
+	`, questionID, quizID, key, contentType, size)
+	if err != nil {
+		return entity.Question{}, mapDB(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return entity.Question{}, domain.ErrNotFound
+	}
+
+	return r.Get(ctx, quizID, questionID)
+}
+
+func (r *QuestionRepository) ClearImage(ctx context.Context, quizID, questionID uuid.UUID) (entity.Question, string, error) {
+	var oldKey *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT image_key
+		FROM questions
+		WHERE id = $1
+		  AND quiz_id = $2
+	`, questionID, quizID).Scan(&oldKey)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return entity.Question{}, "", domain.ErrNotFound
+		}
+		return entity.Question{}, "", mapDB(err)
+	}
+
+	_, err = r.pool.Exec(ctx, `
+		UPDATE questions
+		SET image_key = NULL,
+		    image_content_type = NULL,
+		    image_size_bytes = NULL
+		WHERE id = $1
+		  AND quiz_id = $2
+	`, questionID, quizID)
+	if err != nil {
+		return entity.Question{}, "", mapDB(err)
+	}
+
+	question, err := r.Get(ctx, quizID, questionID)
+	if err != nil {
+		return entity.Question{}, "", err
+	}
+	if oldKey == nil {
+		return question, "", nil
+	}
+	return question, *oldKey, nil
 }
 
 func (r *QuestionRepository) Update(ctx context.Context, question entity.Question) (entity.Question, error) {

@@ -27,6 +27,8 @@ type Server struct {
 	tokens       domainauth.TokenIssuer
 	cookieSecure bool
 	corsOrigins  []string
+	mediaDir     string
+	serveMedia   bool
 }
 
 func NewServer(
@@ -37,6 +39,8 @@ func NewServer(
 	tokens domainauth.TokenIssuer,
 	cookieSecure bool,
 	corsOrigins []string,
+	mediaDir string,
+	serveMedia bool,
 ) *Server {
 	return &Server{
 		auth:         auth,
@@ -46,6 +50,8 @@ func NewServer(
 		tokens:       tokens,
 		cookieSecure: cookieSecure,
 		corsOrigins:  corsOrigins,
+		mediaDir:     mediaDir,
+		serveMedia:   serveMedia,
 	}
 }
 
@@ -76,6 +82,11 @@ func (s *Server) Handler() http.Handler {
 		ResponseErrorHandlerFunc: writeUseCaseError,
 	})
 	openapi.HandlerFromMux(api, router)
+	router.Post("/api/v1/quizzes/{quizId}/questions/{questionId}/image", s.uploadQuestionImage)
+	router.Delete("/api/v1/quizzes/{quizId}/questions/{questionId}/image", s.deleteQuestionImage)
+	if s.serveMedia && s.mediaDir != "" {
+		router.Handle("/media/*", http.StripPrefix("/media/", http.FileServer(http.Dir(s.mediaDir))))
+	}
 
 	return router
 }
@@ -109,6 +120,10 @@ func isPublic(r *http.Request) bool {
 		return true
 	}
 
+	if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/media/") {
+		return true
+	}
+
 	if r.Method != http.MethodPost {
 		return false
 	}
@@ -123,7 +138,11 @@ func isPublic(r *http.Request) bool {
 
 func limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		limit := int64(1 << 20)
+		if strings.HasSuffix(r.URL.Path, "/image") && (r.Method == http.MethodPost || r.Method == http.MethodPut) {
+			limit = 6 << 20
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		next.ServeHTTP(w, r)
 	})
 }

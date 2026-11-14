@@ -732,6 +732,8 @@ components:
           type: integer
         points:
           type: integer
+        image_url:
+          type: string
         options:
           type: array
           items:

@@ -6,6 +6,7 @@ type Envelope struct {
 	PlayerJoined     *PlayerJoined     `json:"player_joined,omitempty"`
 	QuestionStarted  *QuestionStarted  `json:"question_started,omitempty"`
 	AnswerAccepted   *AnswerAccepted   `json:"answer_accepted,omitempty"`
+	AnswersProgress  *AnswersProgress  `json:"answers_progress,omitempty"`
 	QuestionRevealed *QuestionRevealed `json:"question_revealed,omitempty"`
 	Leaderboard      *Leaderboard      `json:"leaderboard,omitempty"`
 	GameFinished     *GameFinished     `json:"game_finished,omitempty"`
@@ -53,11 +54,20 @@ type QuestionStarted struct {
 	Type           string           `json:"type"`
 	TimeLimitSec   int              `json:"time_limit_sec"`
 	Options        []QuestionOption `json:"options,omitempty"`
+	ImageURL       string           `json:"image_url,omitempty"`
 	DeadlineUnixMs int64            `json:"deadline_unix_ms"`
 }
 
 type AnswerAccepted struct {
 	QuestionID string `json:"question_id"`
+}
+
+type AnswersProgress struct {
+	QuestionID     string   `json:"question_id"`
+	Answered       int      `json:"answered"`
+	Total          int      `json:"total"`
+	AnsweredIDs    []string `json:"answered_ids"`
+	DeadlineUnixMs int64    `json:"deadline_unix_ms"`
 }
 
 type QuestionRevealed struct {

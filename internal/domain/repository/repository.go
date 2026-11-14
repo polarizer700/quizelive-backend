@@ -78,4 +78,6 @@ type QuestionRepository interface {
 	Update(ctx context.Context, question entity.Question) (entity.Question, error)
 	Delete(ctx context.Context, quizID, questionID uuid.UUID) error
 	Reorder(ctx context.Context, quizID uuid.UUID, ids []uuid.UUID) error
+	SetImage(ctx context.Context, quizID, questionID uuid.UUID, key, contentType string, size int64) (entity.Question, error)
+	ClearImage(ctx context.Context, quizID, questionID uuid.UUID) (entity.Question, string, error)
 }

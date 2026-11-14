@@ -103,6 +103,7 @@ type LoginRequest struct {
 // Question defines model for Question.
 type Question struct {
 	Id           openapi_types.UUID `json:"id"`
+	ImageUrl     *string            `json:"image_url,omitempty"`
 	Options      []AnswerOption     `json:"options"`
 	Points       int                `json:"points"`
 	Position     int                `json:"position"`

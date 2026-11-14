@@ -14,9 +14,11 @@ import (
 	"github.com/polarizer700/quizelive-backend/internal/app/usecase"
 	"github.com/polarizer700/quizelive-backend/internal/config"
 	"github.com/polarizer700/quizelive-backend/internal/domain/auth"
+	"github.com/polarizer700/quizelive-backend/internal/domain/media"
 	domainrepo "github.com/polarizer700/quizelive-backend/internal/domain/repository"
 	infraauth "github.com/polarizer700/quizelive-backend/internal/infrastructure/auth"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/mail"
+	inframedia "github.com/polarizer700/quizelive-backend/internal/infrastructure/media"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/repository"
 	adminhttp "github.com/polarizer700/quizelive-backend/internal/transport/http"
 	wsgame "github.com/polarizer700/quizelive-backend/internal/transport/ws"
@@ -41,6 +43,7 @@ func Module() fx.Option {
 		fx.Provide(asPasswordHasher),
 		fx.Provide(asTokenIssuer),
 		fx.Provide(newMailer),
+		fx.Provide(newMediaStore),
 		fx.Provide(newAuth),
 		fx.Provide(usecase.NewUsers),
 		fx.Provide(usecase.NewQuizzes),
@@ -88,6 +91,10 @@ func newMailer(cfg *config.Config) auth.Mailer {
 	return mail.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.MailFrom)
 }
 
+func newMediaStore(cfg *config.Config) (media.Store, error) {
+	return inframedia.NewDiskStore(cfg.MediaDir, cfg.MediaPublicURL)
+}
+
 func asUserRepository(repo *repository.UserRepository) domainrepo.UserRepository { return repo }
 
 func asRefreshTokenRepository(repo *repository.RefreshTokenRepository) domainrepo.RefreshTokenRepository {
@@ -122,14 +129,24 @@ func newHTTPServer(
 	questions *usecase.Questions,
 	tokens auth.TokenIssuer,
 ) *http.Server {
-	handler := adminhttp.NewServer(authn, users, quizzes, questions, tokens, cfg.CookieSecure, cfg.CORSOrigins()).Handler()
+	handler := adminhttp.NewServer(
+		authn,
+		users,
+		quizzes,
+		questions,
+		tokens,
+		cfg.CookieSecure,
+		cfg.CORSOrigins(),
+		cfg.MediaDir,
+		cfg.AppEnv == "local",
+	).Handler()
 
 	return &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 }

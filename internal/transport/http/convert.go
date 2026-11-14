@@ -72,7 +72,7 @@ func toQuestion(question entity.Question) openapi.Question {
 		answers = []string{}
 	}
 
-	return openapi.Question{
+	out := openapi.Question{
 		Id:           openapi_types.UUID(question.ID),
 		QuizId:       openapi_types.UUID(question.QuizID),
 		Position:     question.Position,
@@ -83,6 +83,12 @@ func toQuestion(question entity.Question) openapi.Question {
 		Options:      options,
 		TextAnswers:  answers,
 	}
+	if question.ImageURL != "" {
+		url := question.ImageURL
+		out.ImageUrl = &url
+	}
+
+	return out
 }
 
 func toQuestions(questions []entity.Question) []openapi.Question {
