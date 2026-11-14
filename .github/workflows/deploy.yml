@@ -36,6 +36,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -rf /opt/quizelive/bin.new && mkdir -p /opt/quizelive/bin.new'
           rsync -az -e "ssh -i ~/.ssh/deploy_key" deploy/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/bin.new/
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" migrations/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/migrations/
 
       - name: Activate, migrate and restart services
         run: |
@@ -45,7 +46,7 @@ jobs:
             install -m 750 -o root -g quizelive /opt/quizelive/bin.new/game-server /opt/quizelive/bin/game-server
             rm -rf /opt/quizelive/bin.new
             set -a; . /etc/quizelive.env; set +a
-            /opt/quizelive/bin/admin-api migrate
+            cd /opt/quizelive && ./bin/admin-api migrate
             systemctl restart quizelive-admin quizelive-game
             sleep 3
             systemctl is-active quizelive-admin quizelive-game
