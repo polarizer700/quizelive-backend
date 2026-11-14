@@ -99,7 +99,7 @@ func (s *telegramSink) send(ctx context.Context, level slog.Level, msg string, a
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
 }
 

@@ -23,7 +23,7 @@ func Up(databaseURL string) error {
 		return fmt.Errorf("open database: %w", err)
 	}
 
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err = db.Ping(); err != nil {
 		return fmt.Errorf("ping database: %w", err)

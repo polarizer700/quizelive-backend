@@ -22,6 +22,7 @@ func (s *Server) uploadQuestionImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #nosec G120 -- тело запроса уже ограничено (6 МиБ для /image) через MaxBytesReader в limitBody
 	if err = r.ParseMultipartForm(6 << 20); err != nil {
 		writeUseCaseError(w, r, errInvalidBody())
 		return
@@ -32,7 +33,7 @@ func (s *Server) uploadQuestionImage(w http.ResponseWriter, r *http.Request) {
 		writeUseCaseError(w, r, errInvalidBody())
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contentType := header.Header.Get("Content-Type")
 	if detected := usecase.ImageContentType(header.Filename); detected != "" {

@@ -140,7 +140,12 @@ func (a *Auth) Register(ctx context.Context, emailRaw, password string) error {
 		return err
 	}
 
-	return a.sendVerificationEmail(ctx, user.ID, email)
+	if err = a.sendVerificationEmail(ctx, user.ID, email); err != nil {
+		// Аккаунт уже создан: письмо можно дослать при входе, не блокируем регистрацию на SMTP.
+		slog.Error("verification email after register", "category", "mail", "email", email, "error", err)
+	}
+
+	return nil
 }
 
 func (a *Auth) sendVerificationEmail(ctx context.Context, userID uuid.UUID, email string) error {

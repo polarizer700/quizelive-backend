@@ -25,7 +25,7 @@ func (r *EmailVerificationRepository) ReplacePending(ctx context.Context, userID
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := sqlcdb.New(tx)
 	if err = q.DeletePendingVerifications(ctx, userID); err != nil {
@@ -48,7 +48,7 @@ func (r *EmailVerificationRepository) Consume(ctx context.Context, tokenHash []b
 	if err != nil {
 		return uuid.Nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := sqlcdb.New(tx)
 	userID, err := q.ConsumeEmailVerification(ctx, sqlcdb.ConsumeEmailVerificationParams{

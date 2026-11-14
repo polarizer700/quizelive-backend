@@ -23,7 +23,7 @@ func (r *PasswordResetRepository) ReplacePending(ctx context.Context, userID uui
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := sqlcdb.New(tx)
 	if err = q.DeletePendingPasswordResets(ctx, userID); err != nil {

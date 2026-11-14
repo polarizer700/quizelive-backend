@@ -41,8 +41,8 @@ func (r *QuestionRepository) Create(ctx context.Context, question entity.Questio
 		Position:     position,
 		Type:         string(question.Type),
 		Text:         question.Text,
-		TimeLimitSec: int32(question.TimeLimitSec),
-		Points:       int32(question.Points),
+		TimeLimitSec: int32(question.TimeLimitSec), // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 5..300
+		Points:       int32(question.Points),       // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 1..10000
 	})
 	if err != nil {
 		return entity.Question{}, mapDB(err)
@@ -230,8 +230,8 @@ func (r *QuestionRepository) Update(ctx context.Context, question entity.Questio
 		ID:           question.ID,
 		Type:         string(question.Type),
 		Text:         question.Text,
-		TimeLimitSec: int32(question.TimeLimitSec),
-		Points:       int32(question.Points),
+		TimeLimitSec: int32(question.TimeLimitSec), // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 5..300
+		Points:       int32(question.Points),       // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 1..10000
 	})
 	if err != nil {
 		return entity.Question{}, mapDB(err)
@@ -347,7 +347,7 @@ func replaceChildren(ctx context.Context, q *sqlcdb.Queries, questionID uuid.UUI
 	for _, option := range question.Options {
 		row, err := q.CreateOption(ctx, sqlcdb.CreateOptionParams{
 			QuestionID: questionID,
-			Position:   int32(option.Position),
+			Position:   int32(option.Position), // #nosec G115 -- позиции назначает PrepareQuestion последовательно от 0 до len(Options)-1
 			Text:       option.Text,
 			IsCorrect:  option.IsCorrect,
 		})

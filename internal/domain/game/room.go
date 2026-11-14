@@ -454,7 +454,7 @@ func (r *Room) finish() []Delivery {
 	entries := r.ranked()
 	results := make([]Result, 0, len(entries))
 	for _, entry := range entries {
-		results = append(results, Result{Nickname: entry.Nickname, Score: entry.Score, Rank: entry.Rank})
+		results = append(results, Result(entry))
 	}
 
 	out := []Delivery{

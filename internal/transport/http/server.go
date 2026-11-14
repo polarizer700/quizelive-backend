@@ -2,6 +2,7 @@ package adminhttp
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -65,7 +66,9 @@ func (s *Server) Handler() http.Handler {
 		MaxAge:           300,
 	}))
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	// Приложение слушает loopback за Caddy на той же машине: доверяем
+	// X-Forwarded-For только когда пир — loopback, иначе берём сам RemoteAddr.
+	router.Use(middleware.ClientIPFromXFF("127.0.0.1/32", "::1/128"))
 	router.Use(middleware.Recoverer)
 	router.Use(limitBody)
 	router.Use(rateLimitAuth)
@@ -148,7 +151,7 @@ func limitBody(next http.Handler) http.Handler {
 }
 
 func rateLimitAuth(next http.Handler) http.Handler {
-	limited := httprate.LimitByIP(10, time.Minute)(next)
+	limited := httprate.LimitBy(10, time.Minute, clientIPKey)(next)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -159,6 +162,20 @@ func rateLimitAuth(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// clientIPKey ключует rate limiter по IP клиента, который разрешил
+// middleware.ClientIPFromXFF (с доверием только к loopback-пиру),
+// с фолбэком на адрес TCP-пира.
+func clientIPKey(r *http.Request) (string, error) {
+	if ip := middleware.GetClientIP(r.Context()); ip != "" {
+		return ip, nil
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr, nil
+	}
+	return host, nil
 }
 
 type httpBag struct {
@@ -181,7 +198,7 @@ func (s *Server) setRefreshCookie(ctx context.Context, raw string, expires time.
 		return
 	}
 
-	http.SetCookie(bag.w, &http.Cookie{
+	http.SetCookie(bag.w, &http.Cookie{ // #nosec G124 -- Secure задаётся конфигом (true в проде за HTTPS), HttpOnly и SameSite=Strict выставлены явно
 		Name:     refreshCookie,
 		Value:    raw,
 		Path:     "/api/v1/auth",
@@ -198,7 +215,7 @@ func (s *Server) clearRefreshCookie(ctx context.Context) {
 		return
 	}
 
-	http.SetCookie(bag.w, &http.Cookie{
+	http.SetCookie(bag.w, &http.Cookie{ // #nosec G124 -- Secure задаётся конфигом (true в проде за HTTPS), HttpOnly и SameSite=Strict выставлены явно
 		Name:     refreshCookie,
 		Value:    "",
 		Path:     "/api/v1/auth",

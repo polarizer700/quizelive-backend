@@ -16,7 +16,7 @@ type DiskStore struct {
 
 func NewDiskStore(root, publicURL string) (*DiskStore, error) {
 	root = filepath.Clean(root)
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := os.MkdirAll(root, 0o750); err != nil {
 		return nil, err
 	}
 
@@ -32,7 +32,7 @@ func (s *DiskStore) Put(_ context.Context, key, contentType string, body io.Read
 	}
 
 	path := filepath.Join(s.root, filepath.FromSlash(key))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
 
@@ -53,6 +53,11 @@ func (s *DiskStore) Put(_ context.Context, key, contentType string, body io.Read
 		return fmt.Errorf("unexpected size")
 	}
 	if err = tmp.Close(); err != nil {
+		return err
+	}
+	// Файл должен читаться группой quizelive: туда входит пользователь caddy,
+	// который отдаёт /media/ по HTTP.
+	if err = os.Chmod(tmp.Name(), 0o640); err != nil { // #nosec G302 -- 0640 нужен для чтения группой quizelive (caddy)
 		return err
 	}
 

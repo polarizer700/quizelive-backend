@@ -239,7 +239,7 @@ func doJSON(t *testing.T, client *http.Client, method, url, access string, body 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	payload, err := io.ReadAll(res.Body)
 	if err != nil {
