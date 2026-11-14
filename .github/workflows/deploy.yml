@@ -34,9 +34,13 @@ jobs:
 
       - name: Upload binaries to staging dir
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -rf /opt/quizelive/bin.new && mkdir -p /opt/quizelive/bin.new'
-          rsync -az -e "ssh -i ~/.ssh/deploy_key" deploy/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/bin.new/
-          rsync -az -e "ssh -i ~/.ssh/deploy_key" migrations/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/migrations/
+          for i in 1 2 3; do
+            ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -rf /opt/quizelive/bin.new && mkdir -p /opt/quizelive/bin.new' && \
+            rsync -az -e "ssh -i ~/.ssh/deploy_key" deploy/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/bin.new/ && \
+            rsync -az -e "ssh -i ~/.ssh/deploy_key" migrations/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/quizelive/migrations/ && exit 0
+            echo "upload attempt $i failed, retrying..."; sleep 5
+          done
+          exit 1
 
       - name: Activate, migrate and restart services
         run: |
