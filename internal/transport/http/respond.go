@@ -29,7 +29,7 @@ func writeUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
 
 	status, body := mapError(err)
 	if status >= 500 {
-		slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+		slog.Error("request failed", "category", "http", "method", r.Method, "path", r.URL.Path, "error", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -6,8 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/polarizer700/quizelive-backend/internal/domain"
 	"github.com/polarizer700/quizelive-backend/internal/domain/auth"
@@ -27,11 +30,13 @@ type Auth struct {
 	users         repository.UserRepository
 	tokens        repository.RefreshTokenRepository
 	verifications repository.EmailVerificationRepository
+	resets        repository.PasswordResetRepository
 	hasher        auth.PasswordHasher
 	issuer        auth.TokenIssuer
 	mailer        auth.Mailer
 	refreshTTL    time.Duration
 	verifyTTL     time.Duration
+	resetTTL      time.Duration
 	publicURL     string
 	now           func() time.Time
 }
@@ -40,6 +45,7 @@ func NewAuth(
 	users repository.UserRepository,
 	tokens repository.RefreshTokenRepository,
 	verifications repository.EmailVerificationRepository,
+	resets repository.PasswordResetRepository,
 	hasher auth.PasswordHasher,
 	issuer auth.TokenIssuer,
 	mailer auth.Mailer,
@@ -55,11 +61,13 @@ func NewAuth(
 		users:         users,
 		tokens:        tokens,
 		verifications: verifications,
+		resets:        resets,
 		hasher:        hasher,
 		issuer:        issuer,
 		mailer:        mailer,
 		refreshTTL:    refreshTTL,
 		verifyTTL:     verifyTTL,
+		resetTTL:      time.Hour,
 		publicURL:     strings.TrimRight(publicURL, "/"),
 		now:           time.Now,
 	}
@@ -91,6 +99,9 @@ func (a *Auth) Login(ctx context.Context, emailRaw, password string) (Session, e
 	}
 
 	if user.EmailVerifiedAt == nil {
+		if err := a.sendVerificationEmail(ctx, user.ID, email); err != nil {
+			slog.Error("resend verification on login", "category", "mail", "email", email, "error", err)
+		}
 		return Session{}, &domain.EmailUnverifiedError{}
 	}
 
@@ -129,12 +140,16 @@ func (a *Auth) Register(ctx context.Context, emailRaw, password string) error {
 		return err
 	}
 
+	return a.sendVerificationEmail(ctx, user.ID, email)
+}
+
+func (a *Auth) sendVerificationEmail(ctx context.Context, userID uuid.UUID, email string) error {
 	raw, tokenHash, err := newSecret()
 	if err != nil {
 		return err
 	}
 
-	if err = a.verifications.ReplacePending(ctx, user.ID, tokenHash, a.now().Add(a.verifyTTL)); err != nil {
+	if err = a.verifications.ReplacePending(ctx, userID, tokenHash, a.now().Add(a.verifyTTL)); err != nil {
 		return err
 	}
 
@@ -163,6 +178,85 @@ func (a *Auth) VerifyEmail(ctx context.Context, rawToken string) error {
 	}
 
 	return nil
+}
+
+func (a *Auth) RequestPasswordReset(ctx context.Context, emailRaw string) error {
+	email, err := entity.NormalizeEmail(emailRaw)
+	if err != nil {
+		return err
+	}
+
+	user, err := a.users.GetByEmail(ctx, email)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	raw, tokenHash, err := newSecret()
+	if err != nil {
+		return err
+	}
+
+	if err = a.resets.ReplacePending(ctx, user.ID, tokenHash, a.now().Add(a.resetTTL)); err != nil {
+		return err
+	}
+
+	link := a.publicURL + "/reset-password?token=" + raw
+	text := "Сброс пароля QuizeLive:\n\n" + link + "\n\nСсылка действует 1 час. Если вы не запрашивали сброс, проигнорируйте письмо."
+
+	return a.mailer.Send(ctx, auth.Message{
+		To:      email,
+		Subject: "Сброс пароля QuizeLive",
+		Text:    text,
+	})
+}
+
+func (a *Auth) ConfirmPasswordReset(ctx context.Context, rawToken, password string) error {
+	rawToken = strings.TrimSpace(rawToken)
+	if rawToken == "" {
+		return domain.FieldErrorf("token", "invalid", "token is invalid or expired")
+	}
+
+	if err := entity.ValidatePassword(password); err != nil {
+		return err
+	}
+
+	now := a.now()
+	userID, err := a.resets.Consume(ctx, hashRefresh(rawToken), now)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.FieldErrorf("token", "invalid", "token is invalid or expired")
+		}
+		return err
+	}
+
+	user, err := a.users.GetByID(ctx, userID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.FieldErrorf("token", "invalid", "token is invalid or expired")
+	}
+	if err != nil {
+		return err
+	}
+
+	hash, err := a.hasher.Hash(password)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = hash
+	if _, err = a.users.Update(ctx, user); err != nil {
+		return err
+	}
+
+	if user.EmailVerifiedAt == nil {
+		if err = a.users.MarkEmailVerified(ctx, user.ID, now); err != nil {
+			return err
+		}
+	}
+
+	return a.tokens.RevokeAllForUser(ctx, user.ID, now)
 }
 
 func (a *Auth) Refresh(ctx context.Context, rawToken string) (Session, error) {

@@ -15,6 +15,7 @@ func NewLogSender() *LogSender {
 }
 
 func (s *LogSender) Send(_ context.Context, message auth.Message) error {
-	slog.Info("mail", "to", message.To, "subject", message.Subject, "text", message.Text)
+	// Не пишем тело письма: там могут быть токены подтверждения.
+	slog.Info("mail queued locally", "category", "mail", "to", message.To, "subject", message.Subject)
 	return nil
 }

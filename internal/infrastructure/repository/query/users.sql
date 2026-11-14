@@ -61,3 +61,20 @@ RETURNING user_id;
 SELECT user_id, used_at
 FROM email_verifications
 WHERE token_hash = $1;
+
+-- name: DeletePendingPasswordResets :exec
+DELETE FROM password_resets
+WHERE user_id = $1
+  AND used_at IS NULL;
+
+-- name: InsertPasswordReset :exec
+INSERT INTO password_resets (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3);
+
+-- name: ConsumePasswordReset :one
+UPDATE password_resets
+SET used_at = $2
+WHERE token_hash = $1
+  AND used_at IS NULL
+  AND expires_at > $2
+RETURNING user_id;

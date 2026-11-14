@@ -81,7 +81,7 @@ func TestPublishedQuizHostToken(t *testing.T) {
 	}
 	status := doJSON(t, client, http.MethodPost, httpServer.URL+"/api/v1/auth/login", "", map[string]string{
 		"email":    "admin@quizelive.test",
-		"password": "password123",
+		"password": "Password123",
 	}, &login)
 	if status != http.StatusOK || login.AccessToken == "" {
 		t.Fatalf("login status %d token %q", status, login.AccessToken)
@@ -168,7 +168,7 @@ func newAPI(t *testing.T, pool *pgxpool.Pool) http.Handler {
 	}
 
 	users := usecase.NewUsers(repository.NewUserRepository(pool), hasher)
-	if _, err = users.CreateAdmin(context.Background(), "admin@quizelive.test", "password123"); err != nil {
+	if _, err = users.CreateAdmin(context.Background(), "admin@quizelive.test", "Password123"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,6 +177,7 @@ func newAPI(t *testing.T, pool *pgxpool.Pool) http.Handler {
 			repository.NewUserRepository(pool),
 			repository.NewRefreshTokenRepository(pool),
 			repository.NewEmailVerificationRepository(pool),
+			repository.NewPasswordResetRepository(pool),
 			hasher,
 			tokens,
 			mail.NewLogSender(),

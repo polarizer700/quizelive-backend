@@ -65,5 +65,21 @@ func ValidatePassword(password string) error {
 		return domain.FieldErrorf("password", "invalid", "password must be 8 to 200 characters")
 	}
 
+	var lower, upper, digit bool
+	for _, r := range password {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'а' && r <= 'я', r == 'ё':
+			lower = true
+		case r >= 'A' && r <= 'Z', r >= 'А' && r <= 'Я', r == 'Ё':
+			upper = true
+		case r >= '0' && r <= '9':
+			digit = true
+		}
+	}
+
+	if !lower || !upper || !digit {
+		return domain.FieldErrorf("password", "invalid", "password must include lower, upper and digit")
+	}
+
 	return nil
 }

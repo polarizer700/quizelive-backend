@@ -78,6 +78,30 @@ func (s *Server) VerifyEmail(ctx context.Context, request openapi.VerifyEmailReq
 	return openapi.VerifyEmail204Response{}, nil
 }
 
+func (s *Server) ForgotPassword(ctx context.Context, request openapi.ForgotPasswordRequestObject) (openapi.ForgotPasswordResponseObject, error) {
+	if request.Body == nil {
+		return nil, errInvalidBody()
+	}
+
+	if err := s.auth.RequestPasswordReset(ctx, string(request.Body.Email)); err != nil {
+		return nil, err
+	}
+
+	return openapi.ForgotPassword204Response{}, nil
+}
+
+func (s *Server) ResetPassword(ctx context.Context, request openapi.ResetPasswordRequestObject) (openapi.ResetPasswordResponseObject, error) {
+	if request.Body == nil {
+		return nil, errInvalidBody()
+	}
+
+	if err := s.auth.ConfirmPasswordReset(ctx, request.Body.Token, request.Body.Password); err != nil {
+		return nil, err
+	}
+
+	return openapi.ResetPassword204Response{}, nil
+}
+
 func (s *Server) ListUsers(ctx context.Context, request openapi.ListUsersRequestObject) (openapi.ListUsersResponseObject, error) {
 	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
 

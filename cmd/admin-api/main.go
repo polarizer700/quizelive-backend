@@ -57,7 +57,7 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		slog.Error("admin-api", "error", err)
+		slog.Error("admin-api", "category", "lifecycle", "error", err)
 		os.Exit(1)
 	}
 }

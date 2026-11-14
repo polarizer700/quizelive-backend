@@ -86,6 +86,13 @@ func (r *UserRepository) Update(ctx context.Context, user entity.User) (entity.U
 	return userFrom(row.ID, row.Email, row.PasswordHash, row.Role, row.EmailVerifiedAt, row.CreatedAt), nil
 }
 
+func (r *UserRepository) MarkEmailVerified(ctx context.Context, id uuid.UUID, at time.Time) error {
+	return mapDB(r.q.MarkUserEmailVerified(ctx, sqlcdb.MarkUserEmailVerifiedParams{
+		ID:              id,
+		EmailVerifiedAt: pgTime(at),
+	}))
+}
+
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return mapDB(r.q.DeleteUser(ctx, id))
 }

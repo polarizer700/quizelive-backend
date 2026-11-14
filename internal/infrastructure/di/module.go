@@ -17,6 +17,7 @@ import (
 	"github.com/polarizer700/quizelive-backend/internal/domain/media"
 	domainrepo "github.com/polarizer700/quizelive-backend/internal/domain/repository"
 	infraauth "github.com/polarizer700/quizelive-backend/internal/infrastructure/auth"
+	"github.com/polarizer700/quizelive-backend/internal/infrastructure/logging"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/mail"
 	inframedia "github.com/polarizer700/quizelive-backend/internal/infrastructure/media"
 	"github.com/polarizer700/quizelive-backend/internal/infrastructure/repository"
@@ -27,6 +28,7 @@ import (
 func Module() fx.Option {
 	return fx.Options(
 		fx.Provide(config.Load),
+		fx.Invoke(configureAdminLogging),
 		fx.Provide(newPool),
 		fx.Provide(infraauth.NewHasher),
 		fx.Provide(infraauth.NewTokenManager),
@@ -35,9 +37,11 @@ func Module() fx.Option {
 		fx.Provide(repository.NewQuizRepository),
 		fx.Provide(repository.NewQuestionRepository),
 		fx.Provide(repository.NewEmailVerificationRepository),
+		fx.Provide(repository.NewPasswordResetRepository),
 		fx.Provide(asUserRepository),
 		fx.Provide(asRefreshTokenRepository),
 		fx.Provide(asEmailVerificationRepository),
+		fx.Provide(asPasswordResetRepository),
 		fx.Provide(asQuizRepository),
 		fx.Provide(asQuestionRepository),
 		fx.Provide(asPasswordHasher),
@@ -55,6 +59,7 @@ func Module() fx.Option {
 func GameModule() fx.Option {
 	return fx.Options(
 		fx.Provide(config.Load),
+		fx.Invoke(configureGameLogging),
 		fx.Provide(newPool),
 		fx.Provide(infraauth.NewTokenManager),
 		fx.Provide(repository.NewQuizRepository),
@@ -71,16 +76,33 @@ func GameModule() fx.Option {
 	)
 }
 
+func configureAdminLogging(cfg *config.Config) {
+	logging.Configure(logging.TelegramConfig{
+		Token:   cfg.TelegramToken,
+		ChatID:  cfg.TelegramChatID,
+		Service: "admin-api",
+	})
+}
+
+func configureGameLogging(cfg *config.Config) {
+	logging.Configure(logging.TelegramConfig{
+		Token:   cfg.TelegramToken,
+		ChatID:  cfg.TelegramChatID,
+		Service: "game-server",
+	})
+}
+
 func newAuth(
 	users domainrepo.UserRepository,
 	tokens domainrepo.RefreshTokenRepository,
 	verifications domainrepo.EmailVerificationRepository,
+	resets domainrepo.PasswordResetRepository,
 	hasher auth.PasswordHasher,
 	issuer auth.TokenIssuer,
 	mailer auth.Mailer,
 	cfg *config.Config,
 ) *usecase.Auth {
-	return usecase.NewAuth(users, tokens, verifications, hasher, issuer, mailer, cfg.RefreshTTL, cfg.VerifyTTL, cfg.PublicAppURL)
+	return usecase.NewAuth(users, tokens, verifications, resets, hasher, issuer, mailer, cfg.RefreshTTL, cfg.VerifyTTL, cfg.PublicAppURL)
 }
 
 func newMailer(cfg *config.Config) auth.Mailer {
@@ -102,6 +124,10 @@ func asRefreshTokenRepository(repo *repository.RefreshTokenRepository) domainrep
 }
 
 func asEmailVerificationRepository(repo *repository.EmailVerificationRepository) domainrepo.EmailVerificationRepository {
+	return repo
+}
+
+func asPasswordResetRepository(repo *repository.PasswordResetRepository) domainrepo.PasswordResetRepository {
 	return repo
 }
 
@@ -180,9 +206,9 @@ func StartGame(lc fx.Lifecycle, server *wsgame.Server, cfg *config.Config) {
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			go func() {
-				slog.Info("game-server listening", "addr", httpServer.Addr)
+				slog.Info("game-server listening", "category", "lifecycle", "addr", httpServer.Addr)
 				if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("game-server stopped", "error", err)
+					slog.Error("game-server stopped", "category", "lifecycle", "error", err)
 				}
 			}()
 
@@ -198,9 +224,9 @@ func StartHTTP(lc fx.Lifecycle, server *http.Server) {
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			go func() {
-				slog.Info("admin-api listening", "addr", server.Addr)
+				slog.Info("admin-api listening", "category", "lifecycle", "addr", server.Addr)
 				if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("admin-api stopped", "error", err)
+					slog.Error("admin-api stopped", "category", "lifecycle", "error", err)
 				}
 			}()
 

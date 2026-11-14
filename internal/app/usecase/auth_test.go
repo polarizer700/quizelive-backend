@@ -22,15 +22,15 @@ func TestRegisterThenVerify(t *testing.T) {
 	users := &fakeUsers{byEmail: map[string]entity.User{}, byID: map[uuid.UUID]entity.User{}}
 	verifications := &fakeVerifications{users: users}
 	mailbox := &fakeMailer{}
-	authn := NewAuth(users, &fakeTokens{}, verifications, fakeHasher{}, fakeIssuer{}, mailbox, time.Hour, time.Hour, "http://localhost:5173")
+	authn := NewAuth(users, &fakeTokens{}, verifications, &fakeResets{}, fakeHasher{}, fakeIssuer{}, mailbox, time.Hour, time.Hour, "http://localhost:5173")
 	now := time.Unix(1_700_000_000, 0)
 	authn.now = func() time.Time { return now }
 
-	if err := authn.Register(context.Background(), "Editor@QuizeLive.test", "password123"); err != nil {
+	if err := authn.Register(context.Background(), "Editor@QuizeLive.test", "Password123"); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := authn.Login(context.Background(), "editor@quizelive.test", "password123"); !errors.As(err, new(*domain.EmailUnverifiedError)) {
+	if _, err := authn.Login(context.Background(), "editor@quizelive.test", "Password123"); !errors.As(err, new(*domain.EmailUnverifiedError)) {
 		t.Fatalf("unverified login: %v", err)
 	}
 
@@ -44,7 +44,7 @@ func TestRegisterThenVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := authn.Login(context.Background(), "editor@quizelive.test", "password123"); err != nil {
+	if _, err := authn.Login(context.Background(), "editor@quizelive.test", "Password123"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -62,7 +62,7 @@ func TestRefreshReusesRevokedToken(t *testing.T) {
 	}
 	store := &fakeTokens{}
 	users := &fakeUsers{byEmail: map[string]entity.User{user.Email: user}, byID: map[uuid.UUID]entity.User{user.ID: user}}
-	authn := NewAuth(users, store, &fakeVerifications{}, fakeHasher{}, fakeIssuer{}, &fakeMailer{}, time.Hour, time.Hour, "http://localhost:5173")
+	authn := NewAuth(users, store, &fakeVerifications{}, &fakeResets{}, fakeHasher{}, fakeIssuer{}, &fakeMailer{}, time.Hour, time.Hour, "http://localhost:5173")
 	authn.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 	session, err := authn.Login(context.Background(), user.Email, "password123")
@@ -166,6 +166,17 @@ func (f *fakeUsers) Update(_ context.Context, user entity.User) (entity.User, er
 	return user, nil
 }
 
+func (f *fakeUsers) MarkEmailVerified(_ context.Context, id uuid.UUID, at time.Time) error {
+	user, ok := f.byID[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	user.EmailVerifiedAt = &at
+	f.byID[id] = user
+	f.byEmail[user.Email] = user
+	return nil
+}
+
 func (f *fakeUsers) Delete(context.Context, uuid.UUID) error { return nil }
 
 type fakeTokens struct {
@@ -257,4 +268,69 @@ func (f *fakeMailer) Send(_ context.Context, message auth.Message) error {
 	f.text = message.Text
 
 	return nil
+}
+
+type fakeResets struct {
+	userID  uuid.UUID
+	hash    []byte
+	expires time.Time
+	used    bool
+}
+
+func (f *fakeResets) ReplacePending(_ context.Context, userID uuid.UUID, tokenHash []byte, expiresAt time.Time) error {
+	f.userID = userID
+	f.hash = append([]byte(nil), tokenHash...)
+	f.expires = expiresAt
+	f.used = false
+	return nil
+}
+
+func (f *fakeResets) Consume(_ context.Context, tokenHash []byte, at time.Time) (uuid.UUID, error) {
+	if f.used || string(f.hash) != string(tokenHash) || !f.expires.After(at) {
+		return uuid.Nil, domain.ErrNotFound
+	}
+	f.used = true
+	return f.userID, nil
+}
+
+func TestPasswordResetFlow(t *testing.T) {
+	t.Parallel()
+
+	verified := time.Unix(1_700_000_000, 0)
+	user := entity.User{
+		ID:              uuid.New(),
+		Email:           "editor@quizelive.test",
+		Role:            entity.RoleEditor,
+		PasswordHash:    "hash:OldPass123",
+		EmailVerifiedAt: &verified,
+	}
+	users := &fakeUsers{byEmail: map[string]entity.User{user.Email: user}, byID: map[uuid.UUID]entity.User{user.ID: user}}
+	resets := &fakeResets{}
+	mailbox := &fakeMailer{}
+	tokens := &fakeTokens{}
+	authn := NewAuth(users, tokens, &fakeVerifications{}, resets, fakeHasher{}, fakeIssuer{}, mailbox, time.Hour, time.Hour, "http://localhost:5173")
+	now := time.Unix(1_700_000_100, 0)
+	authn.now = func() time.Time { return now }
+
+	if err := authn.RequestPasswordReset(context.Background(), user.Email); err != nil {
+		t.Fatal(err)
+	}
+	_, raw, ok := strings.Cut(mailbox.text, "token=")
+	if !ok {
+		t.Fatalf("mail has no token: %s", mailbox.text)
+	}
+	raw, _, _ = strings.Cut(raw, "\n")
+
+	if err := authn.ConfirmPasswordReset(context.Background(), raw, "NewPass123"); err != nil {
+		t.Fatal(err)
+	}
+	if users.byID[user.ID].PasswordHash != "hash:NewPass123" {
+		t.Fatalf("password not updated: %s", users.byID[user.ID].PasswordHash)
+	}
+	if !tokens.allRevoked {
+		t.Fatal("sessions must be revoked")
+	}
+	if _, err := authn.Login(context.Background(), user.Email, "NewPass123"); err != nil {
+		t.Fatal(err)
+	}
 }

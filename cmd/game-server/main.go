@@ -17,7 +17,7 @@ func main() {
 	app.Run()
 
 	if err := app.Err(); err != nil {
-		slog.Error("game-server", "error", err)
+		slog.Error("game-server", "category", "lifecycle", "error", err)
 		os.Exit(1)
 	}
 }

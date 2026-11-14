@@ -39,7 +39,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: s.patterns})
 	if err != nil {
-		slog.Info("websocket rejected", "error", err)
+		slog.Warn("websocket rejected", "category", "ws", "error", err)
 		return
 	}
 

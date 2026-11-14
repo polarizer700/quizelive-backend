@@ -262,7 +262,7 @@ func (h *Hub) persist(room *game.Room, results []game.Result) {
 	defer cancel()
 
 	if err := h.sessions.Finish(ctx, room.SessionID, time.Now(), rows); err != nil {
-		slog.Error("save game results", "code", room.Code, "error", err)
+		slog.Error("save game results", "category", "game", "code", room.Code, "error", err)
 	}
 }
 

@@ -42,14 +42,25 @@ type GameSession struct {
 	CreatedAt  pgtype.Timestamptz
 }
 
+type PasswordReset struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+	UsedAt    pgtype.Timestamptz
+}
+
 type Question struct {
-	ID           uuid.UUID
-	QuizID       uuid.UUID
-	Position     int32
-	Type         string
-	Text         string
-	TimeLimitSec int32
-	Points       int32
+	ID               uuid.UUID
+	QuizID           uuid.UUID
+	Position         int32
+	Type             string
+	Text             string
+	TimeLimitSec     int32
+	Points           int32
+	ImageKey         *string
+	ImageContentType *string
+	ImageSizeBytes   *int64
 }
 
 type Quiz struct {

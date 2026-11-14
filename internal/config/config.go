@@ -29,6 +29,8 @@ type Config struct {
 	MailFrom       string        `env:"MAIL_FROM" envDefault:"QuizeLive <noreply@quizelive.local>"`
 	MediaDir       string        `env:"MEDIA_DIR" envDefault:"./.media"`
 	MediaPublicURL string        `env:"MEDIA_PUBLIC_URL" envDefault:"http://127.0.0.1:8086/media"`
+	TelegramToken  string        `env:"TELEGRAM_BOT_TOKEN"`
+	TelegramChatID string        `env:"TELEGRAM_CHAT_ID"`
 }
 
 func (c Config) CORSOrigins() []string {

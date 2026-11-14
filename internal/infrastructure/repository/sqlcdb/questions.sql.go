@@ -57,7 +57,17 @@ type CreateQuestionParams struct {
 	Points       int32
 }
 
-func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) (Question, error) {
+type CreateQuestionRow struct {
+	ID           uuid.UUID
+	QuizID       uuid.UUID
+	Position     int32
+	Type         string
+	Text         string
+	TimeLimitSec int32
+	Points       int32
+}
+
+func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) (CreateQuestionRow, error) {
 	row := q.db.QueryRow(ctx, createQuestion,
 		arg.QuizID,
 		arg.Position,
@@ -66,7 +76,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 		arg.TimeLimitSec,
 		arg.Points,
 	)
-	var i Question
+	var i CreateQuestionRow
 	err := row.Scan(
 		&i.ID,
 		&i.QuizID,
@@ -142,9 +152,19 @@ type GetQuestionParams struct {
 	QuizID uuid.UUID
 }
 
-func (q *Queries) GetQuestion(ctx context.Context, arg GetQuestionParams) (Question, error) {
+type GetQuestionRow struct {
+	ID           uuid.UUID
+	QuizID       uuid.UUID
+	Position     int32
+	Type         string
+	Text         string
+	TimeLimitSec int32
+	Points       int32
+}
+
+func (q *Queries) GetQuestion(ctx context.Context, arg GetQuestionParams) (GetQuestionRow, error) {
 	row := q.db.QueryRow(ctx, getQuestion, arg.ID, arg.QuizID)
-	var i Question
+	var i GetQuestionRow
 	err := row.Scan(
 		&i.ID,
 		&i.QuizID,
@@ -199,15 +219,25 @@ WHERE quiz_id = $1
 ORDER BY position
 `
 
-func (q *Queries) ListQuestionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]Question, error) {
+type ListQuestionsByQuizRow struct {
+	ID           uuid.UUID
+	QuizID       uuid.UUID
+	Position     int32
+	Type         string
+	Text         string
+	TimeLimitSec int32
+	Points       int32
+}
+
+func (q *Queries) ListQuestionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]ListQuestionsByQuizRow, error) {
 	rows, err := q.db.Query(ctx, listQuestionsByQuiz, quizID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Question
+	var items []ListQuestionsByQuizRow
 	for rows.Next() {
-		var i Question
+		var i ListQuestionsByQuizRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.QuizID,
@@ -317,7 +347,17 @@ type UpdateQuestionParams struct {
 	Points       int32
 }
 
-func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) (Question, error) {
+type UpdateQuestionRow struct {
+	ID           uuid.UUID
+	QuizID       uuid.UUID
+	Position     int32
+	Type         string
+	Text         string
+	TimeLimitSec int32
+	Points       int32
+}
+
+func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) (UpdateQuestionRow, error) {
 	row := q.db.QueryRow(ctx, updateQuestion,
 		arg.ID,
 		arg.Type,
@@ -325,7 +365,7 @@ func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) 
 		arg.TimeLimitSec,
 		arg.Points,
 	)
-	var i Question
+	var i UpdateQuestionRow
 	err := row.Scan(
 		&i.ID,
 		&i.QuizID,

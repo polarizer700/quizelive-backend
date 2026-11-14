@@ -20,6 +20,7 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (entity.User, error)
 	List(ctx context.Context, page Page) ([]entity.User, int64, error)
 	Update(ctx context.Context, user entity.User) (entity.User, error)
+	MarkEmailVerified(ctx context.Context, id uuid.UUID, at time.Time) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -27,6 +28,11 @@ type EmailVerificationRepository interface {
 	// ReplacePending забывает старые неиспользованные ссылки и сохраняет новую.
 	ReplacePending(ctx context.Context, userID uuid.UUID, tokenHash []byte, expiresAt time.Time) error
 	// Consume помечает ссылку использованной и подтверждает почту пользователя.
+	Consume(ctx context.Context, tokenHash []byte, at time.Time) (uuid.UUID, error)
+}
+
+type PasswordResetRepository interface {
+	ReplacePending(ctx context.Context, userID uuid.UUID, tokenHash []byte, expiresAt time.Time) error
 	Consume(ctx context.Context, tokenHash []byte, at time.Time) (uuid.UUID, error)
 }
 

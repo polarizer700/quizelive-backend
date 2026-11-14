@@ -33,6 +33,27 @@ func (q *Queries) ConsumeEmailVerification(ctx context.Context, arg ConsumeEmail
 	return user_id, err
 }
 
+const consumePasswordReset = `-- name: ConsumePasswordReset :one
+UPDATE password_resets
+SET used_at = $2
+WHERE token_hash = $1
+  AND used_at IS NULL
+  AND expires_at > $2
+RETURNING user_id
+`
+
+type ConsumePasswordResetParams struct {
+	TokenHash []byte
+	UsedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ConsumePasswordReset(ctx context.Context, arg ConsumePasswordResetParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, consumePasswordReset, arg.TokenHash, arg.UsedAt)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const countUsers = `-- name: CountUsers :one
 SELECT count(*)::bigint AS total
 FROM users
@@ -84,6 +105,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deletePendingPasswordResets = `-- name: DeletePendingPasswordResets :exec
+DELETE FROM password_resets
+WHERE user_id = $1
+  AND used_at IS NULL
+`
+
+func (q *Queries) DeletePendingPasswordResets(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePendingPasswordResets, userID)
+	return err
 }
 
 const deletePendingVerifications = `-- name: DeletePendingVerifications :exec
@@ -196,6 +228,22 @@ type InsertEmailVerificationParams struct {
 
 func (q *Queries) InsertEmailVerification(ctx context.Context, arg InsertEmailVerificationParams) error {
 	_, err := q.db.Exec(ctx, insertEmailVerification, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
+}
+
+const insertPasswordReset = `-- name: InsertPasswordReset :exec
+INSERT INTO password_resets (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3)
+`
+
+type InsertPasswordResetParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) InsertPasswordReset(ctx context.Context, arg InsertPasswordResetParams) error {
+	_, err := q.db.Exec(ctx, insertPasswordReset, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	return err
 }
 
