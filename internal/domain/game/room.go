@@ -63,6 +63,8 @@ const (
 	CommandAnswer CommandKind = "answer"
 	CommandNext   CommandKind = "next"
 	CommandTick   CommandKind = "tick"
+	// CommandClose гасит комнату: ведущий открыл новую игру вместо этой.
+	CommandClose CommandKind = "close"
 )
 
 type Command struct {
@@ -185,6 +187,8 @@ func (r *Room) Apply(cmd Command) []Delivery {
 		return r.next(cmd)
 	case CommandTick:
 		return r.tick(cmd)
+	case CommandClose:
+		return []Delivery{{All: true, Msg: errorEnvelope("ROOM_CLOSED", "ведущий открыл новую игру — эта комната закрыта")}}
 	default:
 		return []Delivery{{ConnID: cmd.ConnID, Msg: errorEnvelope("BAD_COMMAND", "неизвестная команда")}}
 	}
@@ -678,6 +682,7 @@ func (q Question) public(index, total int, deadline time.Time) QuestionStarted {
 		Text:           q.Text,
 		Type:           string(q.Type),
 		TimeLimitSec:   int(q.Limit / time.Second),
+		Points:         q.Points,
 		Options:        options,
 		ImageURL:       q.ImageURL,
 		DeadlineUnixMs: deadline.UnixMilli(),

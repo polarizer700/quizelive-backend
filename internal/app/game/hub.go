@@ -81,6 +81,13 @@ func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 	if existing := h.byHost[key]; existing != nil {
 		h.detachLocked(existing)
 		delete(h.byHost, key)
+		existing.finished = true
+		// Просим старую комнату предупредить игроков и завершиться,
+		// чтобы не висеть зомби с тем же кодом
+		select {
+		case existing.in <- inbound{cmd: game.Command{Kind: game.CommandClose, Now: time.Now()}}:
+		default:
+		}
 	}
 
 	box := &mailbox{in: make(chan inbound, 64)}
@@ -224,6 +231,9 @@ func (h *Hub) run(box *mailbox, room *game.Room) {
 			}
 
 			dispatch(room.Apply(msg.cmd))
+			if msg.cmd.Kind == game.CommandClose {
+				return
+			}
 		case now := <-ticks:
 			dispatch(room.Apply(game.Command{Kind: game.CommandTick, Now: now}))
 		}

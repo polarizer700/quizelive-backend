@@ -53,6 +53,7 @@ type QuestionStarted struct {
 	Text           string           `json:"text"`
 	Type           string           `json:"type"`
 	TimeLimitSec   int              `json:"time_limit_sec"`
+	Points         int              `json:"points"`
 	Category       string           `json:"category,omitempty"`
 	Round          int              `json:"round,omitempty"`
 	RoundTotal     int              `json:"round_total,omitempty"`
