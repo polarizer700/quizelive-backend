@@ -7,3 +7,5 @@ coverage.out
 .DS_Store
 .idea/
 .gocache/
+# локальное хранилище загруженных файлов
+.media/
