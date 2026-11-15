@@ -116,14 +116,8 @@ func CanEditQuiz(role Role, userID, ownerID uuid.UUID) bool {
 	return role == RoleEditor && userID == ownerID
 }
 
-func CanIssueHostToken(role Role, userID, ownerID uuid.UUID, status QuizStatus) bool {
-	if status != QuizStatusPublished {
-		return false
-	}
-
-	if role == RoleAdmin || role == RoleHost {
-		return true
-	}
-
-	return role == RoleEditor && userID == ownerID
+// Играть (открывать экран ведущего) может любой авторизованный пользователь
+// в любую опубликованную игру. Редактирование по-прежнему ограничено CanEditQuiz.
+func CanIssueHostToken(_ Role, _, _ uuid.UUID, status QuizStatus) bool {
+	return status == QuizStatusPublished
 }

@@ -79,8 +79,12 @@ func TestCanIssueHostToken(t *testing.T) {
 		t.Fatal("host can open a published quiz")
 	}
 
-	if CanIssueHostToken(RoleEditor, other, owner, QuizStatusPublished) {
-		t.Fatal("editor cannot host someone else's quiz")
+	if !CanIssueHostToken(RoleEditor, other, owner, QuizStatusPublished) {
+		t.Fatal("any user can host someone else's published quiz")
+	}
+
+	if CanIssueHostToken(RoleEditor, owner, owner, QuizStatusDraft) {
+		t.Fatal("owner must not open a draft")
 	}
 }
 
