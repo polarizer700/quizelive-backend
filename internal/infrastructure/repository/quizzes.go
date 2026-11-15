@@ -22,16 +22,18 @@ func NewQuizRepository(pool *pgxpool.Pool) *QuizRepository {
 
 func (r *QuizRepository) Create(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error) {
 	row, err := r.q.CreateQuiz(ctx, sqlcdb.CreateQuizParams{
-		Title:       quiz.Title,
-		Description: quiz.Description,
-		OwnerID:     quiz.OwnerID,
-		Status:      string(quiz.Status),
+		Title:           quiz.Title,
+		Description:     quiz.Description,
+		OwnerID:         quiz.OwnerID,
+		Status:          string(quiz.Status),
+		GameType:        string(quiz.GameType),
+		BreakAfterRound: int32(quiz.BreakAfterRound), // #nosec G115 -- entity.NormalizeGameConfig гарантирует диапазон 0..10
 	})
 	if err != nil {
 		return entity.Quiz{}, mapDB(err)
 	}
 
-	return mapQuiz(row), nil
+	return mapQuiz(quizFromCreate(row)), nil
 }
 
 func (r *QuizRepository) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
@@ -40,7 +42,7 @@ func (r *QuizRepository) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, er
 		return entity.Quiz{}, mapDB(err)
 	}
 
-	return mapQuiz(row), nil
+	return mapQuiz(quizFromGet(row)), nil
 }
 
 func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter) ([]entity.Quiz, int64, error) {
@@ -63,7 +65,7 @@ func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter)
 
 	quizzes := make([]entity.Quiz, 0, len(rows))
 	for _, row := range rows {
-		quizzes = append(quizzes, mapQuiz(row))
+		quizzes = append(quizzes, mapQuiz(quizFromList(row)))
 	}
 
 	return quizzes, total, nil
@@ -71,16 +73,18 @@ func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter)
 
 func (r *QuizRepository) Update(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error) {
 	row, err := r.q.UpdateQuiz(ctx, sqlcdb.UpdateQuizParams{
-		ID:          quiz.ID,
-		Title:       quiz.Title,
-		Description: quiz.Description,
-		Status:      string(quiz.Status),
+		ID:              quiz.ID,
+		Title:           quiz.Title,
+		Description:     quiz.Description,
+		Status:          string(quiz.Status),
+		GameType:        string(quiz.GameType),
+		BreakAfterRound: int32(quiz.BreakAfterRound), // #nosec G115 -- entity.NormalizeGameConfig гарантирует диапазон 0..10
 	})
 	if err != nil {
 		return entity.Quiz{}, mapDB(err)
 	}
 
-	return mapQuiz(row), nil
+	return mapQuiz(quizFromUpdate(row)), nil
 }
 
 func (r *QuizRepository) Delete(ctx context.Context, id uuid.UUID) error {
@@ -103,12 +107,70 @@ func quizFilter(filter repository.QuizFilter) sqlcdb.CountQuizzesParams {
 
 func mapQuiz(row sqlcdb.Quiz) entity.Quiz {
 	return entity.Quiz{
-		ID:          row.ID,
-		Title:       row.Title,
-		Description: row.Description,
-		OwnerID:     row.OwnerID,
-		Status:      entity.QuizStatus(row.Status),
-		CreatedAt:   timeFrom(row.CreatedAt),
-		UpdatedAt:   timeFrom(row.UpdatedAt),
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		OwnerID:         row.OwnerID,
+		Status:          entity.QuizStatus(row.Status),
+		GameType:        entity.QuizGameType(row.GameType),
+		BreakAfterRound: int(row.BreakAfterRound),
+		CreatedAt:       timeFrom(row.CreatedAt),
+		UpdatedAt:       timeFrom(row.UpdatedAt),
+	}
+}
+
+func quizFromCreate(row sqlcdb.CreateQuizRow) sqlcdb.Quiz {
+	return sqlcdb.Quiz{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		OwnerID:         row.OwnerID,
+		Status:          row.Status,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		GameType:        row.GameType,
+		BreakAfterRound: row.BreakAfterRound,
+	}
+}
+
+func quizFromGet(row sqlcdb.GetQuizRow) sqlcdb.Quiz {
+	return sqlcdb.Quiz{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		OwnerID:         row.OwnerID,
+		Status:          row.Status,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		GameType:        row.GameType,
+		BreakAfterRound: row.BreakAfterRound,
+	}
+}
+
+func quizFromList(row sqlcdb.ListQuizzesRow) sqlcdb.Quiz {
+	return sqlcdb.Quiz{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		OwnerID:         row.OwnerID,
+		Status:          row.Status,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		GameType:        row.GameType,
+		BreakAfterRound: row.BreakAfterRound,
+	}
+}
+
+func quizFromUpdate(row sqlcdb.UpdateQuizRow) sqlcdb.Quiz {
+	return sqlcdb.Quiz{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		OwnerID:         row.OwnerID,
+		Status:          row.Status,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		GameType:        row.GameType,
+		BreakAfterRound: row.BreakAfterRound,
 	}
 }

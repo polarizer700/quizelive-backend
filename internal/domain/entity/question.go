@@ -42,6 +42,7 @@ type Question struct {
 	Text             string
 	TimeLimitSec     int
 	Points           int
+	Category         string
 	Options          []AnswerOption
 	TextAnswers      []string
 	ImageKey         string
@@ -73,6 +74,11 @@ func PrepareQuestion(q Question) (Question, error) {
 
 	if q.Points < 1 || q.Points > 10000 {
 		return Question{}, domain.FieldErrorf("points", "invalid", "points must be 1 to 10000")
+	}
+
+	q.Category = strings.TrimSpace(q.Category)
+	if utf8.RuneCountInString(q.Category) > 100 {
+		return Question{}, domain.FieldErrorf("category", "invalid", "category must be at most 100 characters")
 	}
 
 	switch q.Type {

@@ -18,6 +18,7 @@ const (
 	PhaseQuestion    = "question"
 	PhaseReveal      = "reveal"
 	PhaseLeaderboard = "leaderboard"
+	PhaseBreak       = "break"
 	PhaseFinished    = "finished"
 	maxPlayers       = 100
 	RevealHold       = 4 * time.Second
@@ -40,6 +41,7 @@ type Question struct {
 	Text     string
 	Limit    time.Duration
 	Points   int
+	Category string
 	Options  []Option
 	Answers  []string
 	ImageURL string
@@ -102,40 +104,69 @@ type submission struct {
 
 // Room хранит состояние одной комнаты. Вызывать методы можно только из горутины этой комнаты.
 type Room struct {
-	Code        string
-	SessionID   uuid.UUID
-	HostID      uuid.UUID
-	HostConn    string
-	Resume      string
-	Questions   []Question
-	Index       int
-	Phase       Phase
-	Players     []*player
-	byNick      map[string]*player
-	byToken     map[string]*player
-	answers     map[string]submission
-	started     time.Time
-	deadline    time.Time
-	finishedSet bool
+	Code            string
+	SessionID       uuid.UUID
+	HostID          uuid.UUID
+	HostConn        string
+	Resume          string
+	Questions       []Question
+	GameType        entity.QuizGameType
+	BreakAfterRound int
+	roundOf         []int
+	roundCount      int
+	Index           int
+	Phase           Phase
+	Players         []*player
+	byNick          map[string]*player
+	byToken         map[string]*player
+	answers         map[string]submission
+	started         time.Time
+	deadline        time.Time
+	finishedSet     bool
 }
 
-func NewRoom(code string, sessionID, hostID uuid.UUID, questions []Question) *Room {
+func NewRoom(code string, sessionID, hostID uuid.UUID, questions []Question, gameType entity.QuizGameType, breakAfterRound int) *Room {
 	resume, err := newToken()
 	if err != nil {
 		resume = code + "-host"
 	}
 
+	roundOf, roundCount := roundLayout(questions)
+
 	return &Room{
-		Code:      code,
-		SessionID: sessionID,
-		HostID:    hostID,
-		Resume:    resume,
-		Questions: questions,
-		Phase:     PhaseLobby,
-		byNick:    map[string]*player{},
-		byToken:   map[string]*player{},
-		answers:   map[string]submission{},
+		Code:            code,
+		SessionID:       sessionID,
+		HostID:          hostID,
+		Resume:          resume,
+		Questions:       questions,
+		GameType:        gameType,
+		BreakAfterRound: breakAfterRound,
+		roundOf:         roundOf,
+		roundCount:      roundCount,
+		Phase:           PhaseLobby,
+		byNick:          map[string]*player{},
+		byToken:         map[string]*player{},
+		answers:         map[string]submission{},
 	}
+}
+
+// roundLayout разбивает вопросы на раунды по последовательным группам
+// одинаковых категорий и возвращает номер раунда (с 1) для каждого вопроса
+// и общее число раундов.
+func roundLayout(questions []Question) ([]int, int) {
+	roundOf := make([]int, len(questions))
+	round := 0
+	last := ""
+	for i, question := range questions {
+		if i == 0 || question.Category != last {
+			round++
+			last = question.Category
+		}
+
+		roundOf[i] = round
+	}
+
+	return roundOf, round
 }
 
 func (r *Room) Apply(cmd Command) []Delivery {
@@ -352,6 +383,8 @@ func (r *Room) next(cmd Command) []Delivery {
 		return r.afterReveal(cmd.Now)
 	case PhaseLeaderboard:
 		return r.afterBoard(cmd.Now)
+	case PhaseBreak:
+		return r.advance(cmd.Now)
 	default:
 		return []Delivery{{ConnID: cmd.ConnID, Msg: errorEnvelope("BAD_PHASE", "сейчас нечего переключать")}}
 	}
@@ -380,7 +413,7 @@ func (r *Room) openQuestion(now time.Time) []Delivery {
 	r.answers = map[string]submission{}
 	r.started = now
 	r.deadline = now.Add(question.Limit)
-	view := question.public(r.Index, len(r.Questions), r.deadline)
+	view := r.questionView(r.Index, r.deadline)
 
 	return []Delivery{
 		{All: true, Msg: r.stateEnvelope()},
@@ -412,12 +445,39 @@ func (r *Room) reveal(now time.Time) []Delivery {
 
 func (r *Room) afterReveal(now time.Time) []Delivery {
 	total := len(r.Questions)
+	if r.shouldBreak(total) {
+		return r.enterBreak()
+	}
+
 	questionNumber := r.Index + 1
 	if r.Index >= total-1 || ShouldShowMidBoard(questionNumber, total) {
 		return r.showBoard(now)
 	}
 
 	return r.advance(now)
+}
+
+// shouldBreak сообщает, нужен ли перерыв после текущего вопроса:
+// только в квизе, после последнего вопроса раунда BreakAfterRound, если впереди ещё есть вопросы.
+func (r *Room) shouldBreak(total int) bool {
+	if r.GameType != entity.GameTypePubQuiz || r.BreakAfterRound <= 0 || r.Index >= total-1 {
+		return false
+	}
+
+	if r.roundOf[r.Index] != r.BreakAfterRound {
+		return false
+	}
+
+	return r.roundOf[r.Index+1] != r.BreakAfterRound
+}
+
+func (r *Room) enterBreak() []Delivery {
+	r.Phase = PhaseBreak
+
+	return []Delivery{
+		{Disarm: true},
+		{All: true, Msg: r.stateEnvelope()},
+	}
 }
 
 func (r *Room) afterBoard(now time.Time) []Delivery {
@@ -477,7 +537,7 @@ func (r *Room) replay(connID string) []Delivery {
 
 	out := make([]Delivery, 0, 2)
 	if r.Phase == PhaseQuestion || r.Phase == PhaseReveal {
-		view := r.Questions[r.Index].public(r.Index, len(r.Questions), r.deadline)
+		view := r.questionView(r.Index, r.deadline)
 		out = append(out, Delivery{ConnID: connID, Msg: Envelope{QuestionStarted: &view}})
 	}
 
@@ -591,6 +651,18 @@ func (r *Room) ranked() []LeaderboardEntry {
 
 func (p *player) view() Player {
 	return Player{ID: p.ID, Nickname: p.Nickname, Score: p.Score, Connected: p.Connected}
+}
+
+func (r *Room) questionView(index int, deadline time.Time) QuestionStarted {
+	question := r.Questions[index]
+	view := question.public(index, len(r.Questions), deadline)
+	if question.Category != "" {
+		view.Category = question.Category
+		view.Round = r.roundOf[index]
+		view.RoundTotal = r.roundCount
+	}
+
+	return view
 }
 
 func (q Question) public(index, total int, deadline time.Time) QuestionStarted {

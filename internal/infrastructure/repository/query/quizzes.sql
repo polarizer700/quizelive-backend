@@ -1,15 +1,15 @@
 -- name: CreateQuiz :one
-INSERT INTO quizzes (title, description, owner_id, status)
-VALUES ($1, $2, $3, $4)
-RETURNING id, title, description, owner_id, status, created_at, updated_at;
+INSERT INTO quizzes (title, description, owner_id, status, game_type, break_after_round)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at;
 
 -- name: GetQuiz :one
-SELECT id, title, description, owner_id, status, created_at, updated_at
+SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE id = $1;
 
 -- name: ListQuizzes :many
-SELECT id, title, description, owner_id, status, created_at, updated_at
+SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE (sqlc.narg('owner_id')::uuid IS NULL OR owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
@@ -27,9 +27,11 @@ UPDATE quizzes
 SET title = $2,
     description = $3,
     status = $4,
+    game_type = $5,
+    break_after_round = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, title, description, owner_id, status, created_at, updated_at;
+RETURNING id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at;
 
 -- name: DeleteQuiz :exec
 DELETE FROM quizzes

@@ -43,6 +43,7 @@ func (r *QuestionRepository) Create(ctx context.Context, question entity.Questio
 		Text:         question.Text,
 		TimeLimitSec: int32(question.TimeLimitSec), // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 5..300
 		Points:       int32(question.Points),       // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 1..10000
+		Category:     question.Category,
 	})
 	if err != nil {
 		return entity.Question{}, mapDB(err)
@@ -57,7 +58,7 @@ func (r *QuestionRepository) Create(ctx context.Context, question entity.Questio
 		return entity.Question{}, err
 	}
 
-	return assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, options, question.TextAnswers), nil
+	return assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, row.Category, options, question.TextAnswers), nil
 }
 
 func (r *QuestionRepository) Get(ctx context.Context, quizID, questionID uuid.UUID) (entity.Question, error) {
@@ -113,7 +114,7 @@ func (r *QuestionRepository) ListByQuiz(ctx context.Context, quizID uuid.UUID) (
 
 	out := make([]entity.Question, 0, len(rows))
 	for _, row := range rows {
-		question := assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, optionsByQuestion[row.ID], answersByQuestion[row.ID])
+		question := assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, row.Category, optionsByQuestion[row.ID], answersByQuestion[row.ID])
 		if image, ok := images[row.ID]; ok {
 			question.ImageKey = image.Key
 			question.ImageContentType = image.ContentType
@@ -232,6 +233,7 @@ func (r *QuestionRepository) Update(ctx context.Context, question entity.Questio
 		Text:         question.Text,
 		TimeLimitSec: int32(question.TimeLimitSec), // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 5..300
 		Points:       int32(question.Points),       // #nosec G115 -- entity.PrepareQuestion гарантирует диапазон 1..10000
+		Category:     question.Category,
 	})
 	if err != nil {
 		return entity.Question{}, mapDB(err)
@@ -246,7 +248,7 @@ func (r *QuestionRepository) Update(ctx context.Context, question entity.Questio
 		return entity.Question{}, err
 	}
 
-	return assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, options, question.TextAnswers), nil
+	return assemble(row.ID, row.QuizID, row.Position, row.Type, row.Text, row.TimeLimitSec, row.Points, row.Category, options, question.TextAnswers), nil
 }
 
 func (r *QuestionRepository) Delete(ctx context.Context, quizID, questionID uuid.UUID) error {
@@ -380,6 +382,7 @@ func assemble(
 	position int32,
 	typ, text string,
 	timeLimitSec, points int32,
+	category string,
 	options []entity.AnswerOption,
 	answers []string,
 ) entity.Question {
@@ -399,6 +402,7 @@ func assemble(
 		Text:         text,
 		TimeLimitSec: int(timeLimitSec),
 		Points:       int(points),
+		Category:     category,
 		Options:      options,
 		TextAnswers:  answers,
 	}

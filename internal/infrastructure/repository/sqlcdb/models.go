@@ -61,16 +61,19 @@ type Question struct {
 	ImageKey         *string
 	ImageContentType *string
 	ImageSizeBytes   *int64
+	Category         string
 }
 
 type Quiz struct {
-	ID          uuid.UUID
-	Title       string
-	Description string
-	OwnerID     uuid.UUID
-	Status      string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	GameType        string
+	BreakAfterRound int32
 }
 
 type RefreshToken struct {

@@ -1,7 +1,7 @@
 -- name: CreateQuestion :one
-INSERT INTO questions (quiz_id, position, type, text, time_limit_sec, points)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, quiz_id, position, type, text, time_limit_sec, points;
+INSERT INTO questions (quiz_id, position, type, text, time_limit_sec, points, category)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, quiz_id, position, type, text, time_limit_sec, points, category;
 
 -- name: NextQuestionPosition :one
 SELECT (COALESCE(MAX(position), 0) + 1)::int AS position
@@ -10,13 +10,13 @@ WHERE quiz_id = $1
   AND position > 0;
 
 -- name: GetQuestion :one
-SELECT id, quiz_id, position, type, text, time_limit_sec, points
+SELECT id, quiz_id, position, type, text, time_limit_sec, points, category
 FROM questions
 WHERE id = $1
   AND quiz_id = $2;
 
 -- name: ListQuestionsByQuiz :many
-SELECT id, quiz_id, position, type, text, time_limit_sec, points
+SELECT id, quiz_id, position, type, text, time_limit_sec, points, category
 FROM questions
 WHERE quiz_id = $1
   AND position > 0
@@ -27,9 +27,10 @@ UPDATE questions
 SET type = $2,
     text = $3,
     time_limit_sec = $4,
-    points = $5
+    points = $5,
+    category = $6
 WHERE id = $1
-RETURNING id, quiz_id, position, type, text, time_limit_sec, points;
+RETURNING id, quiz_id, position, type, text, time_limit_sec, points, category;
 
 -- name: DeleteQuestion :exec
 DELETE FROM questions

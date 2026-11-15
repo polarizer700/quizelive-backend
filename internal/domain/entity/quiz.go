@@ -21,14 +21,52 @@ func (s QuizStatus) Valid() bool {
 	return s == QuizStatusDraft || s == QuizStatusPublished
 }
 
+type QuizGameType string
+
+const (
+	GameTypeQuiz     QuizGameType = "quiz"
+	GameTypePubQuiz  QuizGameType = "pub_quiz"
+	GameTypeJeopardy QuizGameType = "jeopardy"
+)
+
+func (t QuizGameType) Valid() bool {
+	switch t {
+	case GameTypeQuiz, GameTypePubQuiz, GameTypeJeopardy:
+		return true
+	default:
+		return false
+	}
+}
+
+const MaxBreakAfterRound = 10
+
 type Quiz struct {
-	ID          uuid.UUID
-	Title       string
-	Description string
-	OwnerID     uuid.UUID
-	Status      QuizStatus
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          QuizStatus
+	GameType        QuizGameType
+	BreakAfterRound int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+// NormalizeGameConfig проверяет тип игры и раунд перерыва. Перерыв имеет смысл только для pub_quiz.
+func NormalizeGameConfig(gameType QuizGameType, breakAfterRound int) error {
+	if !gameType.Valid() {
+		return domain.FieldErrorf("game_type", "invalid", "game_type must be quiz, pub_quiz or jeopardy")
+	}
+
+	if breakAfterRound < 0 || breakAfterRound > MaxBreakAfterRound {
+		return domain.FieldErrorf("break_after_round", "invalid", "break_after_round must be between 0 and 10")
+	}
+
+	if breakAfterRound > 0 && gameType != GameTypePubQuiz {
+		return domain.FieldErrorf("break_after_round", "invalid", "перерыв доступен только в квизе")
+	}
+
+	return nil
 }
 
 func NormalizeQuizText(title, description string) (string, string, error) {

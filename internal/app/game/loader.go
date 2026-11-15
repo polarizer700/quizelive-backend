@@ -16,10 +16,12 @@ import (
 )
 
 type Catalog struct {
-	QuizID    uuid.UUID
-	HostID    uuid.UUID
-	SessionID uuid.UUID
-	Questions []game.Question
+	QuizID          uuid.UUID
+	HostID          uuid.UUID
+	SessionID       uuid.UUID
+	GameType        entity.QuizGameType
+	BreakAfterRound int
+	Questions       []game.Question
 }
 
 type Loader struct {
@@ -94,10 +96,12 @@ func (l *Loader) Open(ctx context.Context, hostToken, code string) (Catalog, err
 	}
 
 	return Catalog{
-		QuizID:    quiz.ID,
-		HostID:    hostID,
-		SessionID: sessionID,
-		Questions: l.snapshot(rows),
+		QuizID:          quiz.ID,
+		HostID:          hostID,
+		SessionID:       sessionID,
+		GameType:        quiz.GameType,
+		BreakAfterRound: quiz.BreakAfterRound,
+		Questions:       l.snapshot(rows),
 	}, nil
 }
 
@@ -119,6 +123,7 @@ func (l *Loader) snapshot(rows []entity.Question) []game.Question {
 			Text:     row.Text,
 			Limit:    time.Duration(row.TimeLimitSec) * time.Second,
 			Points:   row.Points,
+			Category: row.Category,
 			Options:  options,
 			Answers:  append([]string(nil), row.TextAnswers...),
 			ImageURL: mediaURL(l.mediaPublicURL, row.ImageKey, row.ImageURL),

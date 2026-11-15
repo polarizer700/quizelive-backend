@@ -192,7 +192,17 @@ func (s *Server) CreateQuiz(ctx context.Context, request openapi.CreateQuizReque
 		description = *request.Body.Description
 	}
 
-	quiz, err := s.quizzes.Create(ctx, request.Body.Title, description)
+	gameType := entity.QuizGameType("")
+	if request.Body.GameType != nil {
+		gameType = entity.QuizGameType(*request.Body.GameType)
+	}
+
+	breakAfterRound := 0
+	if request.Body.BreakAfterRound != nil {
+		breakAfterRound = *request.Body.BreakAfterRound
+	}
+
+	quiz, err := s.quizzes.Create(ctx, request.Body.Title, description, gameType, breakAfterRound)
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +228,14 @@ func (s *Server) UpdateQuiz(ctx context.Context, request openapi.UpdateQuizReque
 	if request.Body.Status != nil {
 		status := entity.QuizStatus(*request.Body.Status)
 		patch.Status = &status
+	}
+	if request.Body.GameType != nil {
+		gameType := entity.QuizGameType(*request.Body.GameType)
+		patch.GameType = &gameType
+	}
+	if request.Body.BreakAfterRound != nil {
+		breakAfterRound := *request.Body.BreakAfterRound
+		patch.BreakAfterRound = &breakAfterRound
 	}
 
 	quiz, err := s.quizzes.Update(ctx, uuidFrom(request.QuizId), patch)

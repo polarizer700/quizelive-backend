@@ -122,7 +122,7 @@ func TestPacingSkipsBoardBetweenCheckpoints(t *testing.T) {
 			},
 		}
 	}
-	room := NewRoom("1111", uuid.New(), uuid.New(), questions)
+	room := NewRoom("1111", uuid.New(), uuid.New(), questions, entity.GameTypeQuiz, 0)
 	room.Apply(Command{Kind: CommandHost, ConnID: "tv", Now: now})
 	room.Apply(Command{Kind: CommandJoin, ConnID: "phone", Nickname: "Аня", Now: now})
 	room.Apply(Command{Kind: CommandStart, ConnID: "tv", Now: now})
@@ -222,5 +222,84 @@ func sampleRoom() *Room {
 			{ID: "paris", Text: "Париж", IsCorrect: true},
 			{ID: "lyon", Text: "Лион"},
 		},
-	}})
+	}}, entity.GameTypeQuiz, 0)
+}
+
+func TestPubQuizBreakAfterRound(t *testing.T) {
+	now := time.Date(2026, 11, 15, 20, 0, 0, 0, time.UTC)
+	questions := []Question{
+		{ID: "q1", Type: entity.QuestionTypeSingle, Text: "Блиц 1", Limit: time.Second, Points: 10, Category: "Блиц",
+			Options: []Option{{ID: "a", Text: "A", IsCorrect: true}, {ID: "b", Text: "B"}}},
+		{ID: "q2", Type: entity.QuestionTypeSingle, Text: "Блиц 2", Limit: time.Second, Points: 10, Category: "Блиц",
+			Options: []Option{{ID: "a", Text: "A", IsCorrect: true}, {ID: "b", Text: "B"}}},
+		{ID: "q3", Type: entity.QuestionTypeSingle, Text: "Хардкор 1", Limit: time.Second, Points: 10, Category: "Хардкор",
+			Options: []Option{{ID: "a", Text: "A", IsCorrect: true}, {ID: "b", Text: "B"}}},
+	}
+	room := NewRoom("7777", uuid.New(), uuid.New(), questions, entity.GameTypePubQuiz, 1)
+	room.Apply(Command{Kind: CommandHost, ConnID: "tv", Now: now})
+	room.Apply(Command{Kind: CommandJoin, ConnID: "phone", Nickname: "Аня", Now: now})
+
+	started := room.Apply(Command{Kind: CommandStart, ConnID: "tv", Now: now})
+	var first *QuestionStarted
+	for _, delivery := range started {
+		if delivery.Msg.QuestionStarted != nil {
+			first = delivery.Msg.QuestionStarted
+		}
+	}
+	if first == nil || first.Category != "Блиц" || first.Round != 1 || first.RoundTotal != 2 {
+		t.Fatalf("round info = %+v", first)
+	}
+
+	// Q1 -> reveal -> мид-борд (половина из 3 вопросов) -> Q2 (ещё не конец раунда, перерыва нет).
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(2 * time.Second)})
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(3 * time.Second)})
+	if room.Phase != PhaseLeaderboard {
+		t.Fatalf("phase after first reveal = %s", room.Phase)
+	}
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(4 * time.Second)})
+	if room.Phase != PhaseQuestion {
+		t.Fatalf("phase after board = %s", room.Phase)
+	}
+
+	// Q2 -> reveal -> конец раунда 1: перерыв.
+	room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(5 * time.Second)})
+	if room.Phase != PhaseReveal {
+		t.Fatalf("phase before break = %s", room.Phase)
+	}
+	breakOut := room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(5 * time.Second)})
+	if room.Phase != PhaseBreak {
+		t.Fatalf("phase = %s, want break", room.Phase)
+	}
+	sawState := false
+	for _, delivery := range breakOut {
+		if delivery.Msg.RoomState != nil && delivery.Msg.RoomState.Phase == PhaseBreak {
+			sawState = true
+		}
+	}
+	if !sawState {
+		t.Fatal("break phase was not announced")
+	}
+
+	// Продолжаем после перерыва — следующий вопрос из раунда 2.
+	continued := room.Apply(Command{Kind: CommandNext, ConnID: "tv", Now: now.Add(6 * time.Second)})
+	var next *QuestionStarted
+	for _, delivery := range continued {
+		if delivery.Msg.QuestionStarted != nil {
+			next = delivery.Msg.QuestionStarted
+		}
+	}
+	if next == nil || next.Category != "Хардкор" || next.Round != 2 {
+		t.Fatalf("question after break = %+v", next)
+	}
+
+	// Тик без ведущего не должен выводить из перерыва.
+	room2 := NewRoom("8888", uuid.New(), uuid.New(), questions, entity.GameTypePubQuiz, 1)
+	room2.Apply(Command{Kind: CommandHost, ConnID: "tv", Now: now})
+	room2.Apply(Command{Kind: CommandJoin, ConnID: "phone", Nickname: "Аня", Now: now})
+	room2.Apply(Command{Kind: CommandStart, ConnID: "tv", Now: now})
+	room2.Phase = PhaseBreak
+	ticked := room2.Apply(Command{Kind: CommandTick, ConnID: "", Now: now.Add(time.Hour)})
+	if room2.Phase != PhaseBreak || len(ticked) != 0 {
+		t.Fatalf("tick in break = %s, %v", room2.Phase, ticked)
+	}
 }

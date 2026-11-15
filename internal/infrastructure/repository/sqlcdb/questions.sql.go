@@ -43,9 +43,9 @@ func (q *Queries) CreateOption(ctx context.Context, arg CreateOptionParams) (Ans
 }
 
 const createQuestion = `-- name: CreateQuestion :one
-INSERT INTO questions (quiz_id, position, type, text, time_limit_sec, points)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, quiz_id, position, type, text, time_limit_sec, points
+INSERT INTO questions (quiz_id, position, type, text, time_limit_sec, points, category)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, quiz_id, position, type, text, time_limit_sec, points, category
 `
 
 type CreateQuestionParams struct {
@@ -55,6 +55,7 @@ type CreateQuestionParams struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 type CreateQuestionRow struct {
@@ -65,6 +66,7 @@ type CreateQuestionRow struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) (CreateQuestionRow, error) {
@@ -75,6 +77,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 		arg.Text,
 		arg.TimeLimitSec,
 		arg.Points,
+		arg.Category,
 	)
 	var i CreateQuestionRow
 	err := row.Scan(
@@ -85,6 +88,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 		&i.Text,
 		&i.TimeLimitSec,
 		&i.Points,
+		&i.Category,
 	)
 	return i, err
 }
@@ -141,7 +145,7 @@ func (q *Queries) DeleteTextAnswersByQuestion(ctx context.Context, questionID uu
 }
 
 const getQuestion = `-- name: GetQuestion :one
-SELECT id, quiz_id, position, type, text, time_limit_sec, points
+SELECT id, quiz_id, position, type, text, time_limit_sec, points, category
 FROM questions
 WHERE id = $1
   AND quiz_id = $2
@@ -160,6 +164,7 @@ type GetQuestionRow struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 func (q *Queries) GetQuestion(ctx context.Context, arg GetQuestionParams) (GetQuestionRow, error) {
@@ -173,6 +178,7 @@ func (q *Queries) GetQuestion(ctx context.Context, arg GetQuestionParams) (GetQu
 		&i.Text,
 		&i.TimeLimitSec,
 		&i.Points,
+		&i.Category,
 	)
 	return i, err
 }
@@ -212,7 +218,7 @@ func (q *Queries) ListOptionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]An
 }
 
 const listQuestionsByQuiz = `-- name: ListQuestionsByQuiz :many
-SELECT id, quiz_id, position, type, text, time_limit_sec, points
+SELECT id, quiz_id, position, type, text, time_limit_sec, points, category
 FROM questions
 WHERE quiz_id = $1
   AND position > 0
@@ -227,6 +233,7 @@ type ListQuestionsByQuizRow struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 func (q *Queries) ListQuestionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]ListQuestionsByQuizRow, error) {
@@ -246,6 +253,7 @@ func (q *Queries) ListQuestionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]
 			&i.Text,
 			&i.TimeLimitSec,
 			&i.Points,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -334,9 +342,10 @@ UPDATE questions
 SET type = $2,
     text = $3,
     time_limit_sec = $4,
-    points = $5
+    points = $5,
+    category = $6
 WHERE id = $1
-RETURNING id, quiz_id, position, type, text, time_limit_sec, points
+RETURNING id, quiz_id, position, type, text, time_limit_sec, points, category
 `
 
 type UpdateQuestionParams struct {
@@ -345,6 +354,7 @@ type UpdateQuestionParams struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 type UpdateQuestionRow struct {
@@ -355,6 +365,7 @@ type UpdateQuestionRow struct {
 	Text         string
 	TimeLimitSec int32
 	Points       int32
+	Category     string
 }
 
 func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) (UpdateQuestionRow, error) {
@@ -364,6 +375,7 @@ func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) 
 		arg.Text,
 		arg.TimeLimitSec,
 		arg.Points,
+		arg.Category,
 	)
 	var i UpdateQuestionRow
 	err := row.Scan(
@@ -374,6 +386,7 @@ func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) 
 		&i.Text,
 		&i.TimeLimitSec,
 		&i.Points,
+		&i.Category,
 	)
 	return i, err
 }

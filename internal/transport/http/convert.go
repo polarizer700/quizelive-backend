@@ -37,13 +37,15 @@ func toUsers(users []entity.User) []openapi.User {
 
 func toQuiz(quiz entity.Quiz) openapi.Quiz {
 	return openapi.Quiz{
-		Id:          openapi_types.UUID(quiz.ID),
-		Title:       quiz.Title,
-		Description: quiz.Description,
-		OwnerId:     openapi_types.UUID(quiz.OwnerID),
-		Status:      openapi.QuizStatus(quiz.Status),
-		CreatedAt:   quiz.CreatedAt,
-		UpdatedAt:   quiz.UpdatedAt,
+		Id:              openapi_types.UUID(quiz.ID),
+		Title:           quiz.Title,
+		Description:     quiz.Description,
+		OwnerId:         openapi_types.UUID(quiz.OwnerID),
+		Status:          openapi.QuizStatus(quiz.Status),
+		GameType:        openapi.QuizGameType(quiz.GameType),
+		BreakAfterRound: quiz.BreakAfterRound,
+		CreatedAt:       quiz.CreatedAt,
+		UpdatedAt:       quiz.UpdatedAt,
 	}
 }
 
@@ -80,6 +82,7 @@ func toQuestion(question entity.Question) openapi.Question {
 		Text:         question.Text,
 		TimeLimitSec: question.TimeLimitSec,
 		Points:       question.Points,
+		Category:     question.Category,
 		Options:      options,
 		TextAnswers:  answers,
 	}
@@ -119,6 +122,10 @@ func fromQuestionInput(input openapi.QuestionInput) entity.Question {
 
 	if input.TextAnswers != nil {
 		question.TextAnswers = append(question.TextAnswers, (*input.TextAnswers)...)
+	}
+
+	if input.Category != nil {
+		question.Category = *input.Category
 	}
 
 	return question

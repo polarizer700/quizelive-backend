@@ -653,9 +653,17 @@ components:
           description: Секунды до истечения access JWT
         user:
           $ref: "#/components/schemas/User"
+    QuizGameType:
+      type: string
+      enum: [quiz, pub_quiz, jeopardy]
+      description: |
+        Тип игры:
+        - quiz — викторина, вопросы подряд;
+        - pub_quiz — квиз, вопросы сгруппированы категориями в раунды, возможен перерыв;
+        - jeopardy — своя игра, категории как темы.
     Quiz:
       type: object
-      required: [id, title, description, owner_id, status, created_at, updated_at]
+      required: [id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at]
       properties:
         id:
           type: string
@@ -669,6 +677,13 @@ components:
           format: uuid
         status:
           $ref: "#/components/schemas/QuizStatus"
+        game_type:
+          $ref: "#/components/schemas/QuizGameType"
+        break_after_round:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: После какого раунда перерыв (только для pub_quiz; 0 — без перерыва)
         created_at:
           type: string
           format: date-time
@@ -697,6 +712,12 @@ components:
         description:
           type: string
           maxLength: 2000
+        game_type:
+          $ref: "#/components/schemas/QuizGameType"
+        break_after_round:
+          type: integer
+          minimum: 0
+          maximum: 10
     UpdateQuizRequest:
       type: object
       properties:
@@ -709,6 +730,12 @@ components:
           maxLength: 2000
         status:
           $ref: "#/components/schemas/QuizStatus"
+        game_type:
+          $ref: "#/components/schemas/QuizGameType"
+        break_after_round:
+          type: integer
+          minimum: 0
+          maximum: 10
     HostToken:
       type: object
       required: [token, expires_in]
@@ -752,6 +779,10 @@ components:
           type: integer
         points:
           type: integer
+        category:
+          type: string
+          maxLength: 100
+          description: Необязательная категория (раунд) вопроса
         options:
           type: array
           items:
@@ -762,7 +793,7 @@ components:
             type: string
     Question:
       type: object
-      required: [id, quiz_id, position, type, text, time_limit_sec, points, options, text_answers]
+      required: [id, quiz_id, position, type, text, time_limit_sec, points, category, options, text_answers]
       properties:
         id:
           type: string
@@ -780,6 +811,8 @@ components:
           type: integer
         points:
           type: integer
+        category:
+          type: string
         image_url:
           type: string
         options:

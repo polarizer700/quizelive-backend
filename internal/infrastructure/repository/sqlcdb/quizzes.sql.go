@@ -32,32 +32,50 @@ func (q *Queries) CountQuizzes(ctx context.Context, arg CountQuizzesParams) (int
 }
 
 const createQuiz = `-- name: CreateQuiz :one
-INSERT INTO quizzes (title, description, owner_id, status)
-VALUES ($1, $2, $3, $4)
-RETURNING id, title, description, owner_id, status, created_at, updated_at
+INSERT INTO quizzes (title, description, owner_id, status, game_type, break_after_round)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 `
 
 type CreateQuizParams struct {
-	Title       string
-	Description string
-	OwnerID     uuid.UUID
-	Status      string
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	GameType        string
+	BreakAfterRound int32
 }
 
-func (q *Queries) CreateQuiz(ctx context.Context, arg CreateQuizParams) (Quiz, error) {
+type CreateQuizRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	GameType        string
+	BreakAfterRound int32
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) CreateQuiz(ctx context.Context, arg CreateQuizParams) (CreateQuizRow, error) {
 	row := q.db.QueryRow(ctx, createQuiz,
 		arg.Title,
 		arg.Description,
 		arg.OwnerID,
 		arg.Status,
+		arg.GameType,
+		arg.BreakAfterRound,
 	)
-	var i Quiz
+	var i CreateQuizRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
 		&i.OwnerID,
 		&i.Status,
+		&i.GameType,
+		&i.BreakAfterRound,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -75,20 +93,34 @@ func (q *Queries) DeleteQuiz(ctx context.Context, id uuid.UUID) error {
 }
 
 const getQuiz = `-- name: GetQuiz :one
-SELECT id, title, description, owner_id, status, created_at, updated_at
+SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE id = $1
 `
 
-func (q *Queries) GetQuiz(ctx context.Context, id uuid.UUID) (Quiz, error) {
+type GetQuizRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	GameType        string
+	BreakAfterRound int32
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetQuiz(ctx context.Context, id uuid.UUID) (GetQuizRow, error) {
 	row := q.db.QueryRow(ctx, getQuiz, id)
-	var i Quiz
+	var i GetQuizRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
 		&i.OwnerID,
 		&i.Status,
+		&i.GameType,
+		&i.BreakAfterRound,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -96,7 +128,7 @@ func (q *Queries) GetQuiz(ctx context.Context, id uuid.UUID) (Quiz, error) {
 }
 
 const listQuizzes = `-- name: ListQuizzes :many
-SELECT id, title, description, owner_id, status, created_at, updated_at
+SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE ($1::uuid IS NULL OR owner_id = $1)
   AND ($2::text IS NULL OR status = $2)
@@ -111,7 +143,19 @@ type ListQuizzesParams struct {
 	RowLimit  int32
 }
 
-func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Quiz, error) {
+type ListQuizzesRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	GameType        string
+	BreakAfterRound int32
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]ListQuizzesRow, error) {
 	rows, err := q.db.Query(ctx, listQuizzes,
 		arg.OwnerID,
 		arg.Status,
@@ -122,15 +166,17 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Qui
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Quiz
+	var items []ListQuizzesRow
 	for rows.Next() {
-		var i Quiz
+		var i ListQuizzesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
 			&i.Description,
 			&i.OwnerID,
 			&i.Status,
+			&i.GameType,
+			&i.BreakAfterRound,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -149,32 +195,52 @@ UPDATE quizzes
 SET title = $2,
     description = $3,
     status = $4,
+    game_type = $5,
+    break_after_round = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, title, description, owner_id, status, created_at, updated_at
+RETURNING id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 `
 
 type UpdateQuizParams struct {
-	ID          uuid.UUID
-	Title       string
-	Description string
-	Status      string
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	Status          string
+	GameType        string
+	BreakAfterRound int32
 }
 
-func (q *Queries) UpdateQuiz(ctx context.Context, arg UpdateQuizParams) (Quiz, error) {
+type UpdateQuizRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	OwnerID         uuid.UUID
+	Status          string
+	GameType        string
+	BreakAfterRound int32
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateQuiz(ctx context.Context, arg UpdateQuizParams) (UpdateQuizRow, error) {
 	row := q.db.QueryRow(ctx, updateQuiz,
 		arg.ID,
 		arg.Title,
 		arg.Description,
 		arg.Status,
+		arg.GameType,
+		arg.BreakAfterRound,
 	)
-	var i Quiz
+	var i UpdateQuizRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
 		&i.OwnerID,
 		&i.Status,
+		&i.GameType,
+		&i.BreakAfterRound,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

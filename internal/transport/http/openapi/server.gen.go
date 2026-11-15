@@ -27,6 +27,13 @@ const (
 	Text     QuestionType = "text"
 )
 
+// Defines values for QuizGameType.
+const (
+	QuizGameTypeJeopardy QuizGameType = "jeopardy"
+	QuizGameTypePubQuiz  QuizGameType = "pub_quiz"
+	QuizGameTypeQuiz     QuizGameType = "quiz"
+)
+
 // Defines values for QuizStatus.
 const (
 	Draft     QuizStatus = "draft"
@@ -65,8 +72,15 @@ type AuthResponse struct {
 
 // CreateQuizRequest defines model for CreateQuizRequest.
 type CreateQuizRequest struct {
-	Description *string `json:"description,omitempty"`
-	Title       string  `json:"title"`
+	BreakAfterRound *int    `json:"break_after_round,omitempty"`
+	Description     *string `json:"description,omitempty"`
+
+	// GameType Тип игры:
+	// - quiz — викторина, вопросы подряд;
+	// - pub_quiz — квиз, вопросы сгруппированы категориями в раунды, возможен перерыв;
+	// - jeopardy — своя игра, категории как темы.
+	GameType *QuizGameType `json:"game_type,omitempty"`
+	Title    string        `json:"title"`
 }
 
 // CreateUserRequest defines model for CreateUserRequest.
@@ -107,6 +121,7 @@ type LoginRequest struct {
 
 // Question defines model for Question.
 type Question struct {
+	Category     string             `json:"category"`
 	Id           openapi_types.UUID `json:"id"`
 	ImageUrl     *string            `json:"image_url,omitempty"`
 	Options      []AnswerOption     `json:"options"`
@@ -121,6 +136,8 @@ type Question struct {
 
 // QuestionInput defines model for QuestionInput.
 type QuestionInput struct {
+	// Category Необязательная категория (раунд) вопроса
+	Category     *string              `json:"category,omitempty"`
 	Options      *[]AnswerOptionInput `json:"options,omitempty"`
 	Points       int                  `json:"points"`
 	Text         string               `json:"text"`
@@ -134,14 +151,28 @@ type QuestionType string
 
 // Quiz defines model for Quiz.
 type Quiz struct {
-	CreatedAt   time.Time          `json:"created_at"`
-	Description string             `json:"description"`
-	Id          openapi_types.UUID `json:"id"`
-	OwnerId     openapi_types.UUID `json:"owner_id"`
-	Status      QuizStatus         `json:"status"`
-	Title       string             `json:"title"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	// BreakAfterRound После какого раунда перерыв (только для pub_quiz; 0 — без перерыва)
+	BreakAfterRound int       `json:"break_after_round"`
+	CreatedAt       time.Time `json:"created_at"`
+	Description     string    `json:"description"`
+
+	// GameType Тип игры:
+	// - quiz — викторина, вопросы подряд;
+	// - pub_quiz — квиз, вопросы сгруппированы категориями в раунды, возможен перерыв;
+	// - jeopardy — своя игра, категории как темы.
+	GameType  QuizGameType       `json:"game_type"`
+	Id        openapi_types.UUID `json:"id"`
+	OwnerId   openapi_types.UUID `json:"owner_id"`
+	Status    QuizStatus         `json:"status"`
+	Title     string             `json:"title"`
+	UpdatedAt time.Time          `json:"updated_at"`
 }
+
+// QuizGameType Тип игры:
+// - quiz — викторина, вопросы подряд;
+// - pub_quiz — квиз, вопросы сгруппированы категориями в раунды, возможен перерыв;
+// - jeopardy — своя игра, категории как темы.
+type QuizGameType string
 
 // QuizList defines model for QuizList.
 type QuizList struct {
@@ -171,9 +202,16 @@ type ResetPasswordRequest struct {
 
 // UpdateQuizRequest defines model for UpdateQuizRequest.
 type UpdateQuizRequest struct {
-	Description *string     `json:"description,omitempty"`
-	Status      *QuizStatus `json:"status,omitempty"`
-	Title       *string     `json:"title,omitempty"`
+	BreakAfterRound *int    `json:"break_after_round,omitempty"`
+	Description     *string `json:"description,omitempty"`
+
+	// GameType Тип игры:
+	// - quiz — викторина, вопросы подряд;
+	// - pub_quiz — квиз, вопросы сгруппированы категориями в раунды, возможен перерыв;
+	// - jeopardy — своя игра, категории как темы.
+	GameType *QuizGameType `json:"game_type,omitempty"`
+	Status   *QuizStatus   `json:"status,omitempty"`
+	Title    *string       `json:"title,omitempty"`
 }
 
 // UpdateUserRequest defines model for UpdateUserRequest.

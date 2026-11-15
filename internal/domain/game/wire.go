@@ -53,6 +53,9 @@ type QuestionStarted struct {
 	Text           string           `json:"text"`
 	Type           string           `json:"type"`
 	TimeLimitSec   int              `json:"time_limit_sec"`
+	Category       string           `json:"category,omitempty"`
+	Round          int              `json:"round,omitempty"`
+	RoundTotal     int              `json:"round_total,omitempty"`
 	Options        []QuestionOption `json:"options,omitempty"`
 	ImageURL       string           `json:"image_url,omitempty"`
 	DeadlineUnixMs int64            `json:"deadline_unix_ms"`

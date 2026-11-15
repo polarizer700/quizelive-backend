@@ -114,7 +114,7 @@ func (h *Hub) Create(ctx context.Context, hostToken string, sub Subscriber) {
 	h.rooms[code] = box
 	h.mu.Unlock()
 
-	room := game.NewRoom(code, catalog.SessionID, catalog.HostID, catalog.Questions)
+	room := game.NewRoom(code, catalog.SessionID, catalog.HostID, catalog.Questions, catalog.GameType, catalog.BreakAfterRound)
 	h.mu.Lock()
 	h.byResume[room.Resume] = box
 	h.mu.Unlock()

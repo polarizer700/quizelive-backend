@@ -22,7 +22,7 @@ func NewQuizzes(quizzes repository.QuizRepository, issuer auth.TokenIssuer) *Qui
 	return &Quizzes{quizzes: quizzes, issuer: issuer}
 }
 
-func (q *Quizzes) Create(ctx context.Context, title, description string) (entity.Quiz, error) {
+func (q *Quizzes) Create(ctx context.Context, title, description string, gameType entity.QuizGameType, breakAfterRound int) (entity.Quiz, error) {
 	actor, err := identity.Require(ctx)
 	if err != nil {
 		return entity.Quiz{}, err
@@ -37,11 +37,21 @@ func (q *Quizzes) Create(ctx context.Context, title, description string) (entity
 		return entity.Quiz{}, err
 	}
 
+	if gameType == "" {
+		gameType = entity.GameTypeQuiz
+	}
+
+	if err := entity.NormalizeGameConfig(gameType, breakAfterRound); err != nil {
+		return entity.Quiz{}, err
+	}
+
 	return q.quizzes.Create(ctx, entity.Quiz{
-		Title:       title,
-		Description: description,
-		OwnerID:     actor.UserID,
-		Status:      entity.QuizStatusDraft,
+		Title:           title,
+		Description:     description,
+		OwnerID:         actor.UserID,
+		Status:          entity.QuizStatusDraft,
+		GameType:        gameType,
+		BreakAfterRound: breakAfterRound,
 	})
 }
 
@@ -104,9 +114,11 @@ func (q *Quizzes) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
 }
 
 type QuizUpdate struct {
-	Title       *string
-	Description *string
-	Status      *entity.QuizStatus
+	Title           *string
+	Description     *string
+	Status          *entity.QuizStatus
+	GameType        *entity.QuizGameType
+	BreakAfterRound *int
 }
 
 func (q *Quizzes) Update(ctx context.Context, id uuid.UUID, patch QuizUpdate) (entity.Quiz, error) {
@@ -153,6 +165,23 @@ func (q *Quizzes) Update(ctx context.Context, id uuid.UUID, patch QuizUpdate) (e
 
 		quiz.Status = *patch.Status
 	}
+
+	gameType := quiz.GameType
+	if patch.GameType != nil {
+		gameType = *patch.GameType
+	}
+
+	breakAfterRound := quiz.BreakAfterRound
+	if patch.BreakAfterRound != nil {
+		breakAfterRound = *patch.BreakAfterRound
+	}
+
+	if err := entity.NormalizeGameConfig(gameType, breakAfterRound); err != nil {
+		return entity.Quiz{}, err
+	}
+
+	quiz.GameType = gameType
+	quiz.BreakAfterRound = breakAfterRound
 
 	return q.quizzes.Update(ctx, quiz)
 }
