@@ -10,6 +10,7 @@ import (
 
 	"github.com/polarizer700/quizelive-backend/internal/domain"
 	"github.com/polarizer700/quizelive-backend/internal/domain/entity"
+	"github.com/polarizer700/quizelive-backend/internal/domain/identity"
 	"github.com/polarizer700/quizelive-backend/internal/domain/media"
 	"github.com/polarizer700/quizelive-backend/internal/domain/repository"
 )
@@ -37,6 +38,20 @@ func (s *Questions) List(ctx context.Context, quizID uuid.UUID) ([]entity.Questi
 	}
 
 	return s.withURLs(rows), nil
+}
+
+// Categories отдаёт уникальные категории вопросов — для подсказок в форме,
+// чтобы редакторы не плодили дубли с опечатками.
+func (s *Questions) Categories(ctx context.Context, search string, limit int) ([]string, error) {
+	if _, err := identity.Require(ctx); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	return s.questions.ListCategories(ctx, search, int32(limit)) // #nosec G115 -- диапазон проверен выше
 }
 
 func (s *Questions) Get(ctx context.Context, quizID, questionID uuid.UUID) (entity.Question, error) {

@@ -16,10 +16,17 @@ const countPublicGames = `-- name: CountPublicGames :one
 SELECT COUNT(*)::bigint
 FROM quizzes
 WHERE status = 'published'
+  AND ($1::text IS NULL OR game_type = $1)
+  AND ($2::text IS NULL OR title ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
 `
 
-func (q *Queries) CountPublicGames(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countPublicGames)
+type CountPublicGamesParams struct {
+	GameType *string
+	Search   *string
+}
+
+func (q *Queries) CountPublicGames(ctx context.Context, arg CountPublicGamesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicGames, arg.GameType, arg.Search)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -30,15 +37,24 @@ SELECT count(*)::bigint AS total
 FROM quizzes
 WHERE ($1::uuid IS NULL OR owner_id = $1)
   AND ($2::text IS NULL OR status = $2)
+  AND ($3::text IS NULL OR game_type = $3)
+  AND ($4::text IS NULL OR title ILIKE '%' || $4 || '%' OR description ILIKE '%' || $4 || '%')
 `
 
 type CountQuizzesParams struct {
-	OwnerID pgtype.UUID
-	Status  *string
+	OwnerID  pgtype.UUID
+	Status   *string
+	GameType *string
+	Search   *string
 }
 
 func (q *Queries) CountQuizzes(ctx context.Context, arg CountQuizzesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countQuizzes, arg.OwnerID, arg.Status)
+	row := q.db.QueryRow(ctx, countQuizzes,
+		arg.OwnerID,
+		arg.Status,
+		arg.GameType,
+		arg.Search,
+	)
 	var total int64
 	err := row.Scan(&total)
 	return total, err
@@ -145,11 +161,15 @@ SELECT q.id, q.title, q.description, q.owner_id, q.game_type, q.created_at,
        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
 FROM quizzes q
 WHERE q.status = 'published'
+  AND ($1::text IS NULL OR q.game_type = $1)
+  AND ($2::text IS NULL OR q.title ILIKE '%' || $2 || '%' OR q.description ILIKE '%' || $2 || '%')
 ORDER BY q.created_at DESC
-LIMIT $2 OFFSET $1
+LIMIT $4 OFFSET $3
 `
 
 type ListPublicGamesParams struct {
+	GameType  *string
+	Search    *string
 	RowOffset int32
 	RowLimit  int32
 }
@@ -165,7 +185,12 @@ type ListPublicGamesRow struct {
 }
 
 func (q *Queries) ListPublicGames(ctx context.Context, arg ListPublicGamesParams) ([]ListPublicGamesRow, error) {
-	rows, err := q.db.Query(ctx, listPublicGames, arg.RowOffset, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listPublicGames,
+		arg.GameType,
+		arg.Search,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -197,13 +222,17 @@ SELECT id, title, description, owner_id, status, game_type, break_after_round, c
 FROM quizzes
 WHERE ($1::uuid IS NULL OR owner_id = $1)
   AND ($2::text IS NULL OR status = $2)
+  AND ($3::text IS NULL OR game_type = $3)
+  AND ($4::text IS NULL OR title ILIKE '%' || $4 || '%' OR description ILIKE '%' || $4 || '%')
 ORDER BY updated_at DESC, id DESC
-LIMIT $4 OFFSET $3
+LIMIT $6 OFFSET $5
 `
 
 type ListQuizzesParams struct {
 	OwnerID   pgtype.UUID
 	Status    *string
+	GameType  *string
+	Search    *string
 	RowOffset int32
 	RowLimit  int32
 }
@@ -224,6 +253,8 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 	rows, err := q.db.Query(ctx, listQuizzes,
 		arg.OwnerID,
 		arg.Status,
+		arg.GameType,
+		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
 	)

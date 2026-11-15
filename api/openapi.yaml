@@ -217,6 +217,15 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/QuizStatus"
+        - name: game_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuizGameType"
+        - name: q
+          in: query
+          description: Поиск по названию и описанию
+          schema:
+            type: string
       responses:
         "200":
           description: Список квизов
@@ -253,6 +262,15 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
+        - name: game_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuizGameType"
+        - name: q
+          in: query
+          description: Поиск по названию и описанию
+          schema:
+            type: string
       responses:
         "200":
           description: Каталог опубликованных игр
@@ -260,6 +278,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicGameList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      parameters:
+        - name: q
+          in: query
+          description: Поиск по категориям
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Уникальные категории вопросов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryList"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /api/v1/quizzes/{quizId}:
@@ -559,6 +602,14 @@ components:
     QuizStatus:
       type: string
       enum: [draft, published]
+    CategoryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: string
     QuestionType:
       type: string
       enum: [single, multiple, text]

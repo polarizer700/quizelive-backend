@@ -217,6 +217,40 @@ func (q *Queries) ListOptionsByQuiz(ctx context.Context, quizID uuid.UUID) ([]An
 	return items, nil
 }
 
+const listQuestionCategories = `-- name: ListQuestionCategories :many
+SELECT DISTINCT category
+FROM questions
+WHERE category <> ''
+  AND ($1::text IS NULL OR category ILIKE '%' || $1 || '%')
+ORDER BY category
+LIMIT $2
+`
+
+type ListQuestionCategoriesParams struct {
+	Search   *string
+	RowLimit int32
+}
+
+func (q *Queries) ListQuestionCategories(ctx context.Context, arg ListQuestionCategoriesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listQuestionCategories, arg.Search, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var category string
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		items = append(items, category)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listQuestionsByQuiz = `-- name: ListQuestionsByQuiz :many
 SELECT id, quiz_id, position, type, text, time_limit_sec, points, category
 FROM questions

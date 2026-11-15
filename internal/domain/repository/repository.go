@@ -53,16 +53,24 @@ type RefreshTokenRepository interface {
 }
 
 type QuizFilter struct {
-	OwnerID *uuid.UUID
-	Status  *entity.QuizStatus
-	Page    Page
+	OwnerID  *uuid.UUID
+	Status   *entity.QuizStatus
+	GameType *entity.QuizGameType
+	Search   string
+	Page     Page
+}
+
+type PublicGameFilter struct {
+	GameType *entity.QuizGameType
+	Search   string
+	Page     Page
 }
 
 type QuizRepository interface {
 	Create(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error)
 	Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error)
 	List(ctx context.Context, filter QuizFilter) ([]entity.Quiz, int64, error)
-	ListPublic(ctx context.Context, page Page) ([]entity.PublicGame, int64, error)
+	ListPublic(ctx context.Context, filter PublicGameFilter) ([]entity.PublicGame, int64, error)
 	Update(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -87,4 +95,6 @@ type QuestionRepository interface {
 	Reorder(ctx context.Context, quizID uuid.UUID, ids []uuid.UUID) error
 	SetImage(ctx context.Context, quizID, questionID uuid.UUID, key, contentType string, size int64) (entity.Question, error)
 	ClearImage(ctx context.Context, quizID, questionID uuid.UUID) (entity.Question, string, error)
+	// ListCategories отдаёт уникальные категории вопросов для подсказок в форме.
+	ListCategories(ctx context.Context, search string, limit int32) ([]string, error)
 }

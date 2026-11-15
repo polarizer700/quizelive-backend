@@ -70,6 +70,11 @@ type AuthResponse struct {
 	User      User `json:"user"`
 }
 
+// CategoryList defines model for CategoryList.
+type CategoryList struct {
+	Items []string `json:"items"`
+}
+
 // CreateQuizRequest defines model for CreateQuizRequest.
 type CreateQuizRequest struct {
 	BreakAfterRound *int    `json:"break_after_round,omitempty"`
@@ -295,17 +300,32 @@ type NotFound = ErrorBody
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorBody
 
+// ListCategoriesParams defines parameters for ListCategories.
+type ListCategoriesParams struct {
+	// Q Поиск по категориям
+	Q     *string `form:"q,omitempty" json:"q,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListPublicGamesParams defines parameters for ListPublicGames.
 type ListPublicGamesParams struct {
-	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit    *Limit        `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset   *Offset       `form:"offset,omitempty" json:"offset,omitempty"`
+	GameType *QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+
+	// Q Поиск по названию и описанию
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
 // ListQuizzesParams defines parameters for ListQuizzes.
 type ListQuizzesParams struct {
-	Limit  *Limit      `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *Offset     `form:"offset,omitempty" json:"offset,omitempty"`
-	Status *QuizStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit    *Limit        `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset   *Offset       `form:"offset,omitempty" json:"offset,omitempty"`
+	Status   *QuizStatus   `form:"status,omitempty" json:"status,omitempty"`
+	GameType *QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+
+	// Q Поиск по названию и описанию
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
@@ -373,6 +393,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/auth/verify-email)
 	VerifyEmail(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/categories)
+	ListCategories(w http.ResponseWriter, r *http.Request, params ListCategoriesParams)
 
 	// (GET /api/v1/games/public)
 	ListPublicGames(w http.ResponseWriter, r *http.Request, params ListPublicGamesParams)
@@ -465,6 +488,11 @@ func (_ Unimplemented) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 // (POST /api/v1/auth/verify-email)
 func (_ Unimplemented) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/categories)
+func (_ Unimplemented) ListCategories(w http.ResponseWriter, r *http.Request, params ListCategoriesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -665,6 +693,47 @@ func (siw *ServerInterfaceWrapper) VerifyEmail(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListCategories operation middleware
+func (siw *ServerInterfaceWrapper) ListCategories(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCategoriesParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCategories(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPublicGames operation middleware
 func (siw *ServerInterfaceWrapper) ListPublicGames(w http.ResponseWriter, r *http.Request) {
 
@@ -692,6 +761,22 @@ func (siw *ServerInterfaceWrapper) ListPublicGames(w http.ResponseWriter, r *htt
 	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "game_type" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "game_type", r.URL.Query(), &params.GameType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "game_type", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
 		return
 	}
 
@@ -741,6 +826,22 @@ func (siw *ServerInterfaceWrapper) ListQuizzes(w http.ResponseWriter, r *http.Re
 	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "game_type" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "game_type", r.URL.Query(), &params.GameType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "game_type", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
 		return
 	}
 
@@ -1401,6 +1502,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/auth/verify-email", wrapper.VerifyEmail)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/categories", wrapper.ListCategories)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/games/public", wrapper.ListPublicGames)
 	})
 	r.Group(func(r chi.Router) {
@@ -1648,6 +1752,32 @@ type VerifyEmail400JSONResponse struct{ BadRequestJSONResponse }
 func (response VerifyEmail400JSONResponse) VisitVerifyEmailResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCategoriesRequestObject struct {
+	Params ListCategoriesParams
+}
+
+type ListCategoriesResponseObject interface {
+	VisitListCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ListCategories200JSONResponse CategoryList
+
+func (response ListCategories200JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCategories401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListCategories401JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -2491,6 +2621,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/auth/verify-email)
 	VerifyEmail(ctx context.Context, request VerifyEmailRequestObject) (VerifyEmailResponseObject, error)
 
+	// (GET /api/v1/categories)
+	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
+
 	// (GET /api/v1/games/public)
 	ListPublicGames(ctx context.Context, request ListPublicGamesRequestObject) (ListPublicGamesResponseObject, error)
 
@@ -2771,6 +2904,32 @@ func (sh *strictHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(VerifyEmailResponseObject); ok {
 		if err := validResponse.VisitVerifyEmailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCategories operation middleware
+func (sh *strictHandler) ListCategories(w http.ResponseWriter, r *http.Request, params ListCategoriesParams) {
+	var request ListCategoriesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCategories(ctx, request.(ListCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCategories")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCategoriesResponseObject); ok {
+		if err := validResponse.VisitListCategoriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

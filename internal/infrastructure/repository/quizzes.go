@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -51,6 +52,8 @@ func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter)
 	rows, err := r.q.ListQuizzes(ctx, sqlcdb.ListQuizzesParams{
 		OwnerID:   params.OwnerID,
 		Status:    params.Status,
+		GameType:  params.GameType,
+		Search:    params.Search,
 		RowLimit:  filter.Page.Limit,
 		RowOffset: filter.Page.Offset,
 	})
@@ -87,16 +90,20 @@ func (r *QuizRepository) Update(ctx context.Context, quiz entity.Quiz) (entity.Q
 	return mapQuiz(quizFromUpdate(row)), nil
 }
 
-func (r *QuizRepository) ListPublic(ctx context.Context, page repository.Page) ([]entity.PublicGame, int64, error) {
+func (r *QuizRepository) ListPublic(ctx context.Context, filter repository.PublicGameFilter) ([]entity.PublicGame, int64, error) {
+	params := publicGameFilter(filter)
+
 	rows, err := r.q.ListPublicGames(ctx, sqlcdb.ListPublicGamesParams{
-		RowLimit:  int32(page.Limit),  // #nosec G115 -- normalizePage гарантирует диапазон 1..100
-		RowOffset: int32(page.Offset), // #nosec G115 -- смещение неотрицательно и укладывается в int32
+		GameType:  params.GameType,
+		Search:    params.Search,
+		RowLimit:  filter.Page.Limit,
+		RowOffset: filter.Page.Offset,
 	})
 	if err != nil {
 		return nil, 0, mapDB(err)
 	}
 
-	total, err := r.q.CountPublicGames(ctx)
+	total, err := r.q.CountPublicGames(ctx, params)
 	if err != nil {
 		return nil, 0, mapDB(err)
 	}
@@ -130,6 +137,29 @@ func quizFilter(filter repository.QuizFilter) sqlcdb.CountQuizzesParams {
 	if filter.Status != nil {
 		status := string(*filter.Status)
 		params.Status = &status
+	}
+
+	if filter.GameType != nil {
+		gameType := string(*filter.GameType)
+		params.GameType = &gameType
+	}
+
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		params.Search = &search
+	}
+
+	return params
+}
+
+func publicGameFilter(filter repository.PublicGameFilter) sqlcdb.CountPublicGamesParams {
+	params := sqlcdb.CountPublicGamesParams{}
+	if filter.GameType != nil {
+		gameType := string(*filter.GameType)
+		params.GameType = &gameType
+	}
+
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		params.Search = &search
 	}
 
 	return params

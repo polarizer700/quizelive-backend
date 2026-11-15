@@ -1,3 +1,11 @@
+-- name: ListQuestionCategories :many
+SELECT DISTINCT category
+FROM questions
+WHERE category <> ''
+  AND (sqlc.narg('search')::text IS NULL OR category ILIKE '%' || sqlc.narg('search') || '%')
+ORDER BY category
+LIMIT sqlc.arg('row_limit');
+
 -- name: CreateQuestion :one
 INSERT INTO questions (quiz_id, position, type, text, time_limit_sec, points, category)
 VALUES ($1, $2, $3, $4, $5, $6, $7)

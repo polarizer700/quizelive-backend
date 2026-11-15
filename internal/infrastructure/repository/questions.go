@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,20 @@ type QuestionRepository struct {
 
 func NewQuestionRepository(pool *pgxpool.Pool) *QuestionRepository {
 	return &QuestionRepository{pool: pool, q: sqlcdb.New(pool)}
+}
+
+func (r *QuestionRepository) ListCategories(ctx context.Context, search string, limit int32) ([]string, error) {
+	params := sqlcdb.ListQuestionCategoriesParams{RowLimit: limit}
+	if search = strings.TrimSpace(search); search != "" {
+		params.Search = &search
+	}
+
+	categories, err := r.q.ListQuestionCategories(ctx, params)
+	if err != nil {
+		return nil, mapDB(err)
+	}
+
+	return categories, nil
 }
 
 func (r *QuestionRepository) Create(ctx context.Context, question entity.Question) (entity.Question, error) {

@@ -174,7 +174,17 @@ func (s *Server) ListQuizzes(ctx context.Context, request openapi.ListQuizzesReq
 		status = string(*request.Params.Status)
 	}
 
-	quizzes, total, err := s.quizzes.List(ctx, status, limit, offset)
+	gameType := ""
+	if request.Params.GameType != nil {
+		gameType = string(*request.Params.GameType)
+	}
+
+	search := ""
+	if request.Params.Q != nil {
+		search = *request.Params.Q
+	}
+
+	quizzes, total, err := s.quizzes.List(ctx, status, gameType, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +223,17 @@ func (s *Server) CreateQuiz(ctx context.Context, request openapi.CreateQuizReque
 func (s *Server) ListPublicGames(ctx context.Context, request openapi.ListPublicGamesRequestObject) (openapi.ListPublicGamesResponseObject, error) {
 	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
 
-	games, total, err := s.quizzes.ListPublic(ctx, limit, offset)
+	gameType := ""
+	if request.Params.GameType != nil {
+		gameType = string(*request.Params.GameType)
+	}
+
+	search := ""
+	if request.Params.Q != nil {
+		search = *request.Params.Q
+	}
+
+	games, total, err := s.quizzes.ListPublic(ctx, gameType, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +244,29 @@ func (s *Server) ListPublicGames(ctx context.Context, request openapi.ListPublic
 	}
 
 	return openapi.ListPublicGames200JSONResponse(openapi.PublicGameList{Items: items, Total: total}), nil
+}
+
+func (s *Server) ListCategories(ctx context.Context, request openapi.ListCategoriesRequestObject) (openapi.ListCategoriesResponseObject, error) {
+	search := ""
+	if request.Params.Q != nil {
+		search = *request.Params.Q
+	}
+
+	limit := 50
+	if request.Params.Limit != nil {
+		limit = *request.Params.Limit
+	}
+
+	categories, err := s.questions.Categories(ctx, search, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	if categories == nil {
+		categories = []string{}
+	}
+
+	return openapi.ListCategories200JSONResponse{Items: categories}, nil
 }
 
 func (s *Server) GetQuiz(ctx context.Context, request openapi.GetQuizRequestObject) (openapi.GetQuizResponseObject, error) {

@@ -55,7 +55,7 @@ func (q *Quizzes) Create(ctx context.Context, title, description string, gameTyp
 	})
 }
 
-func (q *Quizzes) List(ctx context.Context, statusRaw string, limit, offset int) ([]entity.Quiz, int64, error) {
+func (q *Quizzes) List(ctx context.Context, statusRaw, gameTypeRaw, search string, limit, offset int) ([]entity.Quiz, int64, error) {
 	actor, err := identity.Require(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -66,7 +66,12 @@ func (q *Quizzes) List(ctx context.Context, statusRaw string, limit, offset int)
 		return nil, 0, err
 	}
 
-	filter := repository.QuizFilter{Page: page}
+	gameType, err := optionalGameType(gameTypeRaw)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	filter := repository.QuizFilter{Page: page, GameType: gameType, Search: search}
 
 	switch actor.Role {
 	case entity.RoleAdmin:
@@ -96,7 +101,7 @@ func (q *Quizzes) List(ctx context.Context, statusRaw string, limit, offset int)
 }
 
 // ListPublic отдаёт каталог опубликованных игр — виден всем ролям.
-func (q *Quizzes) ListPublic(ctx context.Context, limit, offset int) ([]entity.PublicGame, int64, error) {
+func (q *Quizzes) ListPublic(ctx context.Context, gameTypeRaw, search string, limit, offset int) ([]entity.PublicGame, int64, error) {
 	if _, err := identity.Require(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -106,7 +111,12 @@ func (q *Quizzes) ListPublic(ctx context.Context, limit, offset int) ([]entity.P
 		return nil, 0, err
 	}
 
-	return q.quizzes.ListPublic(ctx, page)
+	gameType, err := optionalGameType(gameTypeRaw)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return q.quizzes.ListPublic(ctx, repository.PublicGameFilter{Page: page, GameType: gameType, Search: search})
 }
 
 func (q *Quizzes) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
@@ -256,6 +266,19 @@ func (q *Quizzes) IssueHostToken(ctx context.Context, id uuid.UUID) (HostToken, 
 	}
 
 	return HostToken{Token: token, ExpiresIn: int(expiresIn.Seconds())}, nil
+}
+
+func optionalGameType(raw string) (*entity.QuizGameType, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	gameType := entity.QuizGameType(raw)
+	if !gameType.Valid() {
+		return nil, domain.FieldErrorf("game_type", "invalid", "game_type must be quiz, pub_quiz or jeopardy")
+	}
+
+	return &gameType, nil
 }
 
 func optionalStatus(raw string) (*entity.QuizStatus, error) {
