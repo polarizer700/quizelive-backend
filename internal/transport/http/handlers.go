@@ -210,6 +210,22 @@ func (s *Server) CreateQuiz(ctx context.Context, request openapi.CreateQuizReque
 	return openapi.CreateQuiz201JSONResponse(toQuiz(quiz)), nil
 }
 
+func (s *Server) ListPublicGames(ctx context.Context, request openapi.ListPublicGamesRequestObject) (openapi.ListPublicGamesResponseObject, error) {
+	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
+
+	games, total, err := s.quizzes.ListPublic(ctx, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]openapi.PublicGame, 0, len(games))
+	for _, game := range games {
+		items = append(items, toPublicGame(game))
+	}
+
+	return openapi.ListPublicGames200JSONResponse(openapi.PublicGameList{Items: items, Total: total}), nil
+}
+
 func (s *Server) GetQuiz(ctx context.Context, request openapi.GetQuizRequestObject) (openapi.GetQuizResponseObject, error) {
 	quiz, err := s.quizzes.Get(ctx, uuidFrom(request.QuizId))
 	if err != nil {

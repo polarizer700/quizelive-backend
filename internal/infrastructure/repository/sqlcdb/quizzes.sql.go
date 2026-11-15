@@ -12,6 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPublicGames = `-- name: CountPublicGames :one
+SELECT COUNT(*)::bigint
+FROM quizzes
+WHERE status = 'published'
+`
+
+func (q *Queries) CountPublicGames(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicGames)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countQuizzes = `-- name: CountQuizzes :one
 SELECT count(*)::bigint AS total
 FROM quizzes
@@ -125,6 +138,56 @@ func (q *Queries) GetQuiz(ctx context.Context, id uuid.UUID) (GetQuizRow, error)
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listPublicGames = `-- name: ListPublicGames :many
+SELECT q.id, q.title, q.description, q.game_type, q.created_at,
+       (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
+FROM quizzes q
+WHERE q.status = 'published'
+ORDER BY q.created_at DESC
+LIMIT $2 OFFSET $1
+`
+
+type ListPublicGamesParams struct {
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListPublicGamesRow struct {
+	ID             uuid.UUID
+	Title          string
+	Description    string
+	GameType       string
+	CreatedAt      pgtype.Timestamptz
+	QuestionsCount int64
+}
+
+func (q *Queries) ListPublicGames(ctx context.Context, arg ListPublicGamesParams) ([]ListPublicGamesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicGames, arg.RowOffset, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicGamesRow
+	for rows.Next() {
+		var i ListPublicGamesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.GameType,
+			&i.CreatedAt,
+			&i.QuestionsCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listQuizzes = `-- name: ListQuizzes :many

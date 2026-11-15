@@ -36,3 +36,16 @@ RETURNING id, title, description, owner_id, status, game_type, break_after_round
 -- name: DeleteQuiz :exec
 DELETE FROM quizzes
 WHERE id = $1;
+
+-- name: ListPublicGames :many
+SELECT q.id, q.title, q.description, q.game_type, q.created_at,
+       (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
+FROM quizzes q
+WHERE q.status = 'published'
+ORDER BY q.created_at DESC
+LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
+
+-- name: CountPublicGames :one
+SELECT COUNT(*)::bigint
+FROM quizzes
+WHERE status = 'published';

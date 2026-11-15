@@ -49,6 +49,17 @@ func toQuiz(quiz entity.Quiz) openapi.Quiz {
 	}
 }
 
+func toPublicGame(game entity.PublicGame) openapi.PublicGame {
+	return openapi.PublicGame{
+		Id:             openapi_types.UUID(game.ID),
+		Title:          game.Title,
+		Description:    game.Description,
+		GameType:       openapi.QuizGameType(game.GameType),
+		QuestionsCount: game.QuestionsCount,
+		CreatedAt:      game.CreatedAt,
+	}
+}
+
 func toQuizzes(quizzes []entity.Quiz) []openapi.Quiz {
 	out := make([]openapi.Quiz, 0, len(quizzes))
 	for _, quiz := range quizzes {

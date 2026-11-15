@@ -95,6 +95,20 @@ func (q *Quizzes) List(ctx context.Context, statusRaw string, limit, offset int)
 	return q.quizzes.List(ctx, filter)
 }
 
+// ListPublic отдаёт каталог опубликованных игр — виден всем ролям.
+func (q *Quizzes) ListPublic(ctx context.Context, limit, offset int) ([]entity.PublicGame, int64, error) {
+	if _, err := identity.Require(ctx); err != nil {
+		return nil, 0, err
+	}
+
+	page, err := normalizePage(limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return q.quizzes.ListPublic(ctx, page)
+}
+
 func (q *Quizzes) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
 	actor, err := identity.Require(ctx)
 	if err != nil {

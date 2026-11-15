@@ -82,9 +82,9 @@ func (s *telegramSink) send(ctx context.Context, level slog.Level, msg string, a
 	}
 
 	payload, _ := json.Marshal(map[string]any{
-		"chat_id":                 s.chatID,
-		"text":                    b.String(),
-		"parse_mode":              "HTML",
+		"chat_id":                  s.chatID,
+		"text":                     b.String(),
+		"parse_mode":               "HTML",
 		"disable_web_page_preview": true,
 	})
 

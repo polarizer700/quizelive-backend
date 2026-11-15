@@ -62,6 +62,7 @@ type QuizRepository interface {
 	Create(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error)
 	Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error)
 	List(ctx context.Context, filter QuizFilter) ([]entity.Quiz, int64, error)
+	ListPublic(ctx context.Context, page Page) ([]entity.PublicGame, int64, error)
 	Update(ctx context.Context, quiz entity.Quiz) (entity.Quiz, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }

@@ -53,6 +53,16 @@ type Quiz struct {
 }
 
 // NormalizeGameConfig проверяет тип игры и раунд перерыва. Перерыв имеет смысл только для pub_quiz.
+// PublicGame — опубликованная игра из общего каталога.
+type PublicGame struct {
+	ID             uuid.UUID
+	Title          string
+	Description    string
+	GameType       QuizGameType
+	QuestionsCount int
+	CreatedAt      time.Time
+}
+
 func NormalizeGameConfig(gameType QuizGameType, breakAfterRound int) error {
 	if !gameType.Valid() {
 		return domain.FieldErrorf("game_type", "invalid", "game_type must be quiz, pub_quiz or jeopardy")
@@ -89,11 +99,12 @@ func CanReadQuiz(role Role, userID, ownerID uuid.UUID, status QuizStatus) bool {
 		return true
 	}
 
-	if role == RoleEditor && userID == ownerID {
+	// Опубликованные игры — общий каталог: читать может любая роль.
+	if status == QuizStatusPublished {
 		return true
 	}
 
-	return role == RoleHost && status == QuizStatusPublished
+	return role == RoleEditor && userID == ownerID
 }
 
 func CanEditQuiz(role Role, userID, ownerID uuid.UUID) bool {

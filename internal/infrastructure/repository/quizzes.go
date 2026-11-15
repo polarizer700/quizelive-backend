@@ -87,6 +87,35 @@ func (r *QuizRepository) Update(ctx context.Context, quiz entity.Quiz) (entity.Q
 	return mapQuiz(quizFromUpdate(row)), nil
 }
 
+func (r *QuizRepository) ListPublic(ctx context.Context, page repository.Page) ([]entity.PublicGame, int64, error) {
+	rows, err := r.q.ListPublicGames(ctx, sqlcdb.ListPublicGamesParams{
+		RowLimit:  int32(page.Limit),  // #nosec G115 -- normalizePage гарантирует диапазон 1..100
+		RowOffset: int32(page.Offset), // #nosec G115 -- смещение неотрицательно и укладывается в int32
+	})
+	if err != nil {
+		return nil, 0, mapDB(err)
+	}
+
+	total, err := r.q.CountPublicGames(ctx)
+	if err != nil {
+		return nil, 0, mapDB(err)
+	}
+
+	games := make([]entity.PublicGame, 0, len(rows))
+	for _, row := range rows {
+		games = append(games, entity.PublicGame{
+			ID:             row.ID,
+			Title:          row.Title,
+			Description:    row.Description,
+			GameType:       entity.QuizGameType(row.GameType),
+			QuestionsCount: int(row.QuestionsCount),
+			CreatedAt:      timeFrom(row.CreatedAt),
+		})
+	}
+
+	return games, total, nil
+}
+
 func (r *QuizRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return mapDB(r.q.DeleteQuiz(ctx, id))
 }
