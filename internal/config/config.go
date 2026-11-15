@@ -17,7 +17,7 @@ type Config struct {
 	JWTSeed        string        `env:"JWT_ED25519_SEED,required"`
 	AccessTTL      time.Duration `env:"JWT_ACCESS_TTL" envDefault:"15m"`
 	RefreshTTL     time.Duration `env:"JWT_REFRESH_TTL" envDefault:"720h"`
-	HostTTL        time.Duration `env:"JWT_HOST_TTL" envDefault:"2m"`
+	HostTTL        time.Duration `env:"JWT_HOST_TTL" envDefault:"12h"`
 	CookieSecure   bool          `env:"COOKIE_SECURE" envDefault:"false"`
 	CORSOriginsRaw []string      `env:"CORS_ORIGINS" envSeparator:","`
 	PublicAppURL   string        `env:"PUBLIC_APP_URL" envDefault:"http://127.0.0.1:5173"`
