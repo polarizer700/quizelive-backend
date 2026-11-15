@@ -12,8 +12,12 @@ WHERE id = $1;
 SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE (sqlc.narg('owner_id')::uuid IS NULL OR owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
-  AND (sqlc.narg('game_type')::text IS NULL OR game_type = sqlc.narg('game_type'))
+  AND (cardinality(sqlc.arg('statuses')::text[]) = 0 OR status = ANY(sqlc.arg('statuses')::text[]))
+  AND (cardinality(sqlc.arg('game_types')::text[]) = 0 OR game_type = ANY(sqlc.arg('game_types')::text[]))
+  AND (cardinality(sqlc.arg('categories')::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY(sqlc.arg('categories')::text[])
+      ))
   AND (sqlc.narg('search')::text IS NULL OR title ILIKE '%' || sqlc.narg('search') || '%' OR description ILIKE '%' || sqlc.narg('search') || '%')
 ORDER BY updated_at DESC, id DESC
 LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
@@ -22,8 +26,12 @@ LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
 SELECT count(*)::bigint AS total
 FROM quizzes
 WHERE (sqlc.narg('owner_id')::uuid IS NULL OR owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
-  AND (sqlc.narg('game_type')::text IS NULL OR game_type = sqlc.narg('game_type'))
+  AND (cardinality(sqlc.arg('statuses')::text[]) = 0 OR status = ANY(sqlc.arg('statuses')::text[]))
+  AND (cardinality(sqlc.arg('game_types')::text[]) = 0 OR game_type = ANY(sqlc.arg('game_types')::text[]))
+  AND (cardinality(sqlc.arg('categories')::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY(sqlc.arg('categories')::text[])
+      ))
   AND (sqlc.narg('search')::text IS NULL OR title ILIKE '%' || sqlc.narg('search') || '%' OR description ILIKE '%' || sqlc.narg('search') || '%');
 
 -- name: UpdateQuiz :one
@@ -46,7 +54,11 @@ SELECT q.id, q.title, q.description, q.owner_id, q.game_type, q.created_at,
        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
 FROM quizzes q
 WHERE q.status = 'published'
-  AND (sqlc.narg('game_type')::text IS NULL OR q.game_type = sqlc.narg('game_type'))
+  AND (cardinality(sqlc.arg('game_types')::text[]) = 0 OR q.game_type = ANY(sqlc.arg('game_types')::text[]))
+  AND (cardinality(sqlc.arg('categories')::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = q.id AND qq.category = ANY(sqlc.arg('categories')::text[])
+      ))
   AND (sqlc.narg('search')::text IS NULL OR q.title ILIKE '%' || sqlc.narg('search') || '%' OR q.description ILIKE '%' || sqlc.narg('search') || '%')
 ORDER BY q.created_at DESC
 LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
@@ -55,5 +67,9 @@ LIMIT sqlc.arg('row_limit') OFFSET sqlc.arg('row_offset');
 SELECT COUNT(*)::bigint
 FROM quizzes
 WHERE status = 'published'
-  AND (sqlc.narg('game_type')::text IS NULL OR game_type = sqlc.narg('game_type'))
+  AND (cardinality(sqlc.arg('game_types')::text[]) = 0 OR game_type = ANY(sqlc.arg('game_types')::text[]))
+  AND (cardinality(sqlc.arg('categories')::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY(sqlc.arg('categories')::text[])
+      ))
   AND (sqlc.narg('search')::text IS NULL OR title ILIKE '%' || sqlc.narg('search') || '%' OR description ILIKE '%' || sqlc.narg('search') || '%');

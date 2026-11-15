@@ -53,17 +53,19 @@ type RefreshTokenRepository interface {
 }
 
 type QuizFilter struct {
-	OwnerID  *uuid.UUID
-	Status   *entity.QuizStatus
-	GameType *entity.QuizGameType
-	Search   string
-	Page     Page
+	OwnerID    *uuid.UUID
+	Statuses   []entity.QuizStatus
+	GameTypes  []entity.QuizGameType
+	Categories []string
+	Search     string
+	Page       Page
 }
 
 type PublicGameFilter struct {
-	GameType *entity.QuizGameType
-	Search   string
-	Page     Page
+	GameTypes  []entity.QuizGameType
+	Categories []string
+	Search     string
+	Page       Page
 }
 
 type QuizRepository interface {

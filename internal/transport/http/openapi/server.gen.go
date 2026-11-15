@@ -309,9 +309,14 @@ type ListCategoriesParams struct {
 
 // ListPublicGamesParams defines parameters for ListPublicGames.
 type ListPublicGamesParams struct {
-	Limit    *Limit        `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset   *Offset       `form:"offset,omitempty" json:"offset,omitempty"`
-	GameType *QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// GameType Фильтр по типам игры (несколько значений через запятую — ИЛИ)
+	GameType *[]QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+
+	// Category Фильтр по категориям вопросов внутри игры (несколько значений через запятую — ИЛИ)
+	Category *[]string `form:"category,omitempty" json:"category,omitempty"`
 
 	// Q Поиск по названию и описанию
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
@@ -319,10 +324,17 @@ type ListPublicGamesParams struct {
 
 // ListQuizzesParams defines parameters for ListQuizzes.
 type ListQuizzesParams struct {
-	Limit    *Limit        `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset   *Offset       `form:"offset,omitempty" json:"offset,omitempty"`
-	Status   *QuizStatus   `form:"status,omitempty" json:"status,omitempty"`
-	GameType *QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Status Фильтр по статусам (несколько значений через запятую — ИЛИ)
+	Status *[]QuizStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// GameType Фильтр по типам игры (несколько значений через запятую — ИЛИ)
+	GameType *[]QuizGameType `form:"game_type,omitempty" json:"game_type,omitempty"`
+
+	// Category Фильтр по категориям вопросов внутри игры (несколько значений через запятую — ИЛИ)
+	Category *[]string `form:"category,omitempty" json:"category,omitempty"`
 
 	// Q Поиск по названию и описанию
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
@@ -766,9 +778,17 @@ func (siw *ServerInterfaceWrapper) ListPublicGames(w http.ResponseWriter, r *htt
 
 	// ------------- Optional query parameter "game_type" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "game_type", r.URL.Query(), &params.GameType)
+	err = runtime.BindQueryParameter("form", false, false, "game_type", r.URL.Query(), &params.GameType)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "game_type", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameter("form", false, false, "category", r.URL.Query(), &params.Category)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
 		return
 	}
 
@@ -823,7 +843,7 @@ func (siw *ServerInterfaceWrapper) ListQuizzes(w http.ResponseWriter, r *http.Re
 
 	// ------------- Optional query parameter "status" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "status", r.URL.Query(), &params.Status)
+	err = runtime.BindQueryParameter("form", false, false, "status", r.URL.Query(), &params.Status)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
 		return
@@ -831,9 +851,17 @@ func (siw *ServerInterfaceWrapper) ListQuizzes(w http.ResponseWriter, r *http.Re
 
 	// ------------- Optional query parameter "game_type" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "game_type", r.URL.Query(), &params.GameType)
+	err = runtime.BindQueryParameter("form", false, false, "game_type", r.URL.Query(), &params.GameType)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "game_type", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameter("form", false, false, "category", r.URL.Query(), &params.Category)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
 		return
 	}
 

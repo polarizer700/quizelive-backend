@@ -51,8 +51,9 @@ func (r *QuizRepository) List(ctx context.Context, filter repository.QuizFilter)
 
 	rows, err := r.q.ListQuizzes(ctx, sqlcdb.ListQuizzesParams{
 		OwnerID:   params.OwnerID,
-		Status:    params.Status,
-		GameType:  params.GameType,
+		Statuses:  params.Statuses,
+		GameTypes: params.GameTypes,
+		Categories: params.Categories,
 		Search:    params.Search,
 		RowLimit:  filter.Page.Limit,
 		RowOffset: filter.Page.Offset,
@@ -94,10 +95,11 @@ func (r *QuizRepository) ListPublic(ctx context.Context, filter repository.Publi
 	params := publicGameFilter(filter)
 
 	rows, err := r.q.ListPublicGames(ctx, sqlcdb.ListPublicGamesParams{
-		GameType:  params.GameType,
-		Search:    params.Search,
-		RowLimit:  filter.Page.Limit,
-		RowOffset: filter.Page.Offset,
+		GameTypes:  params.GameTypes,
+		Categories: params.Categories,
+		Search:     params.Search,
+		RowLimit:   filter.Page.Limit,
+		RowOffset:  filter.Page.Offset,
 	})
 	if err != nil {
 		return nil, 0, mapDB(err)
@@ -129,19 +131,13 @@ func (r *QuizRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func quizFilter(filter repository.QuizFilter) sqlcdb.CountQuizzesParams {
-	params := sqlcdb.CountQuizzesParams{}
+	params := sqlcdb.CountQuizzesParams{
+		Statuses:   quizStatuses(filter.Statuses),
+		GameTypes:  quizGameTypes(filter.GameTypes),
+		Categories: cleanCategories(filter.Categories),
+	}
 	if filter.OwnerID != nil {
 		params.OwnerID = pgtype.UUID{Bytes: *filter.OwnerID, Valid: true}
-	}
-
-	if filter.Status != nil {
-		status := string(*filter.Status)
-		params.Status = &status
-	}
-
-	if filter.GameType != nil {
-		gameType := string(*filter.GameType)
-		params.GameType = &gameType
 	}
 
 	if search := strings.TrimSpace(filter.Search); search != "" {
@@ -152,10 +148,9 @@ func quizFilter(filter repository.QuizFilter) sqlcdb.CountQuizzesParams {
 }
 
 func publicGameFilter(filter repository.PublicGameFilter) sqlcdb.CountPublicGamesParams {
-	params := sqlcdb.CountPublicGamesParams{}
-	if filter.GameType != nil {
-		gameType := string(*filter.GameType)
-		params.GameType = &gameType
+	params := sqlcdb.CountPublicGamesParams{
+		GameTypes:  quizGameTypes(filter.GameTypes),
+		Categories: cleanCategories(filter.Categories),
 	}
 
 	if search := strings.TrimSpace(filter.Search); search != "" {
@@ -163,6 +158,32 @@ func publicGameFilter(filter repository.PublicGameFilter) sqlcdb.CountPublicGame
 	}
 
 	return params
+}
+
+func quizStatuses(statuses []entity.QuizStatus) []string {
+	values := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		values = append(values, string(status))
+	}
+	return values
+}
+
+func quizGameTypes(gameTypes []entity.QuizGameType) []string {
+	values := make([]string, 0, len(gameTypes))
+	for _, gameType := range gameTypes {
+		values = append(values, string(gameType))
+	}
+	return values
+}
+
+func cleanCategories(categories []string) []string {
+	values := make([]string, 0, len(categories))
+	for _, category := range categories {
+		if category = strings.TrimSpace(category); category != "" {
+			values = append(values, category)
+		}
+	}
+	return values
 }
 
 func mapQuiz(row sqlcdb.Quiz) entity.Quiz {

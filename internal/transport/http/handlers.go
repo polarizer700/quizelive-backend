@@ -169,14 +169,24 @@ func (s *Server) DeleteUser(ctx context.Context, request openapi.DeleteUserReque
 
 func (s *Server) ListQuizzes(ctx context.Context, request openapi.ListQuizzesRequestObject) (openapi.ListQuizzesResponseObject, error) {
 	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
-	status := ""
+
+	statuses := make([]string, 0)
 	if request.Params.Status != nil {
-		status = string(*request.Params.Status)
+		for _, status := range *request.Params.Status {
+			statuses = append(statuses, string(status))
+		}
 	}
 
-	gameType := ""
+	gameTypes := make([]string, 0)
 	if request.Params.GameType != nil {
-		gameType = string(*request.Params.GameType)
+		for _, gameType := range *request.Params.GameType {
+			gameTypes = append(gameTypes, string(gameType))
+		}
+	}
+
+	categories := make([]string, 0)
+	if request.Params.Category != nil {
+		categories = append(categories, *request.Params.Category...)
 	}
 
 	search := ""
@@ -184,7 +194,7 @@ func (s *Server) ListQuizzes(ctx context.Context, request openapi.ListQuizzesReq
 		search = *request.Params.Q
 	}
 
-	quizzes, total, err := s.quizzes.List(ctx, status, gameType, search, limit, offset)
+	quizzes, total, err := s.quizzes.List(ctx, statuses, gameTypes, categories, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -223,9 +233,16 @@ func (s *Server) CreateQuiz(ctx context.Context, request openapi.CreateQuizReque
 func (s *Server) ListPublicGames(ctx context.Context, request openapi.ListPublicGamesRequestObject) (openapi.ListPublicGamesResponseObject, error) {
 	limit, offset := pageArgs(request.Params.Limit, request.Params.Offset)
 
-	gameType := ""
+	gameTypes := make([]string, 0)
 	if request.Params.GameType != nil {
-		gameType = string(*request.Params.GameType)
+		for _, gameType := range *request.Params.GameType {
+			gameTypes = append(gameTypes, string(gameType))
+		}
+	}
+
+	categories := make([]string, 0)
+	if request.Params.Category != nil {
+		categories = append(categories, *request.Params.Category...)
 	}
 
 	search := ""
@@ -233,7 +250,7 @@ func (s *Server) ListPublicGames(ctx context.Context, request openapi.ListPublic
 		search = *request.Params.Q
 	}
 
-	games, total, err := s.quizzes.ListPublic(ctx, gameType, search, limit, offset)
+	games, total, err := s.quizzes.ListPublic(ctx, gameTypes, categories, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}

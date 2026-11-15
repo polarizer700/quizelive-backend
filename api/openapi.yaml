@@ -215,12 +215,31 @@ paths:
         - $ref: "#/components/parameters/Offset"
         - name: status
           in: query
+          description: Фильтр по статусам (несколько значений через запятую — ИЛИ)
+          style: form
+          explode: false
           schema:
-            $ref: "#/components/schemas/QuizStatus"
+            type: array
+            items:
+              $ref: "#/components/schemas/QuizStatus"
         - name: game_type
           in: query
+          description: Фильтр по типам игры (несколько значений через запятую — ИЛИ)
+          style: form
+          explode: false
           schema:
-            $ref: "#/components/schemas/QuizGameType"
+            type: array
+            items:
+              $ref: "#/components/schemas/QuizGameType"
+        - name: category
+          in: query
+          description: Фильтр по категориям вопросов внутри игры (несколько значений через запятую — ИЛИ)
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
         - name: q
           in: query
           description: Поиск по названию и описанию
@@ -264,8 +283,22 @@ paths:
         - $ref: "#/components/parameters/Offset"
         - name: game_type
           in: query
+          description: Фильтр по типам игры (несколько значений через запятую — ИЛИ)
+          style: form
+          explode: false
           schema:
-            $ref: "#/components/schemas/QuizGameType"
+            type: array
+            items:
+              $ref: "#/components/schemas/QuizGameType"
+        - name: category
+          in: query
+          description: Фильтр по категориям вопросов внутри игры (несколько значений через запятую — ИЛИ)
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
         - name: q
           in: query
           description: Поиск по названию и описанию

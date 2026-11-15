@@ -55,7 +55,7 @@ func (q *Quizzes) Create(ctx context.Context, title, description string, gameTyp
 	})
 }
 
-func (q *Quizzes) List(ctx context.Context, statusRaw, gameTypeRaw, search string, limit, offset int) ([]entity.Quiz, int64, error) {
+func (q *Quizzes) List(ctx context.Context, statusesRaw, gameTypesRaw, categories []string, search string, limit, offset int) ([]entity.Quiz, int64, error) {
 	actor, err := identity.Require(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -66,33 +66,27 @@ func (q *Quizzes) List(ctx context.Context, statusRaw, gameTypeRaw, search strin
 		return nil, 0, err
 	}
 
-	gameType, err := optionalGameType(gameTypeRaw)
+	gameTypes, err := gameTypesFilter(gameTypesRaw)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	filter := repository.QuizFilter{Page: page, GameType: gameType, Search: search}
+	filter := repository.QuizFilter{Page: page, GameTypes: gameTypes, Categories: categories, Search: search}
 
 	switch actor.Role {
-	case entity.RoleAdmin:
-		status, statusErr := optionalStatus(statusRaw)
+	case entity.RoleAdmin, entity.RoleEditor:
+		if actor.Role == entity.RoleEditor {
+			filter.OwnerID = &actor.UserID
+		}
+
+		statuses, statusErr := statusesFilter(statusesRaw)
 		if statusErr != nil {
 			return nil, 0, statusErr
 		}
 
-		filter.Status = status
-	case entity.RoleEditor:
-		filter.OwnerID = &actor.UserID
-
-		status, statusErr := optionalStatus(statusRaw)
-		if statusErr != nil {
-			return nil, 0, statusErr
-		}
-
-		filter.Status = status
+		filter.Statuses = statuses
 	case entity.RoleHost:
-		published := entity.QuizStatusPublished
-		filter.Status = &published
+		filter.Statuses = []entity.QuizStatus{entity.QuizStatusPublished}
 	default:
 		return nil, 0, domain.ErrForbidden
 	}
@@ -101,7 +95,7 @@ func (q *Quizzes) List(ctx context.Context, statusRaw, gameTypeRaw, search strin
 }
 
 // ListPublic отдаёт каталог опубликованных игр — виден всем ролям.
-func (q *Quizzes) ListPublic(ctx context.Context, gameTypeRaw, search string, limit, offset int) ([]entity.PublicGame, int64, error) {
+func (q *Quizzes) ListPublic(ctx context.Context, gameTypesRaw, categories []string, search string, limit, offset int) ([]entity.PublicGame, int64, error) {
 	if _, err := identity.Require(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -111,12 +105,12 @@ func (q *Quizzes) ListPublic(ctx context.Context, gameTypeRaw, search string, li
 		return nil, 0, err
 	}
 
-	gameType, err := optionalGameType(gameTypeRaw)
+	gameTypes, err := gameTypesFilter(gameTypesRaw)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return q.quizzes.ListPublic(ctx, repository.PublicGameFilter{Page: page, GameType: gameType, Search: search})
+	return q.quizzes.ListPublic(ctx, repository.PublicGameFilter{Page: page, GameTypes: gameTypes, Categories: categories, Search: search})
 }
 
 func (q *Quizzes) Get(ctx context.Context, id uuid.UUID) (entity.Quiz, error) {
@@ -268,30 +262,38 @@ func (q *Quizzes) IssueHostToken(ctx context.Context, id uuid.UUID) (HostToken, 
 	return HostToken{Token: token, ExpiresIn: int(expiresIn.Seconds())}, nil
 }
 
-func optionalGameType(raw string) (*entity.QuizGameType, error) {
-	if raw == "" {
+func gameTypesFilter(raws []string) ([]entity.QuizGameType, error) {
+	if len(raws) == 0 {
 		return nil, nil
 	}
 
-	gameType := entity.QuizGameType(raw)
-	if !gameType.Valid() {
-		return nil, domain.FieldErrorf("game_type", "invalid", "game_type must be quiz, pub_quiz or jeopardy")
+	gameTypes := make([]entity.QuizGameType, 0, len(raws))
+	for _, raw := range raws {
+		gameType := entity.QuizGameType(raw)
+		if !gameType.Valid() {
+			return nil, domain.FieldErrorf("game_type", "invalid", "game_type must be quiz, pub_quiz or jeopardy")
+		}
+		gameTypes = append(gameTypes, gameType)
 	}
 
-	return &gameType, nil
+	return gameTypes, nil
 }
 
-func optionalStatus(raw string) (*entity.QuizStatus, error) {
-	if raw == "" {
+func statusesFilter(raws []string) ([]entity.QuizStatus, error) {
+	if len(raws) == 0 {
 		return nil, nil
 	}
 
-	status := entity.QuizStatus(raw)
-	if !status.Valid() {
-		return nil, domain.FieldErrorf("status", "invalid", "status must be draft or published")
+	statuses := make([]entity.QuizStatus, 0, len(raws))
+	for _, raw := range raws {
+		status := entity.QuizStatus(raw)
+		if !status.Valid() {
+			return nil, domain.FieldErrorf("status", "invalid", "status must be draft or published")
+		}
+		statuses = append(statuses, status)
 	}
 
-	return &status, nil
+	return statuses, nil
 }
 
 func readableQuiz(ctx context.Context, quizzes repository.QuizRepository, id uuid.UUID) (identity.Identity, entity.Quiz, error) {

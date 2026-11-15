@@ -16,17 +16,22 @@ const countPublicGames = `-- name: CountPublicGames :one
 SELECT COUNT(*)::bigint
 FROM quizzes
 WHERE status = 'published'
-  AND ($1::text IS NULL OR game_type = $1)
-  AND ($2::text IS NULL OR title ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
+  AND (cardinality($1::text[]) = 0 OR game_type = ANY($1::text[]))
+  AND (cardinality($2::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY($2::text[])
+      ))
+  AND ($3::text IS NULL OR title ILIKE '%' || $3 || '%' OR description ILIKE '%' || $3 || '%')
 `
 
 type CountPublicGamesParams struct {
-	GameType *string
-	Search   *string
+	GameTypes  []string
+	Categories []string
+	Search     *string
 }
 
 func (q *Queries) CountPublicGames(ctx context.Context, arg CountPublicGamesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countPublicGames, arg.GameType, arg.Search)
+	row := q.db.QueryRow(ctx, countPublicGames, arg.GameTypes, arg.Categories, arg.Search)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -36,23 +41,29 @@ const countQuizzes = `-- name: CountQuizzes :one
 SELECT count(*)::bigint AS total
 FROM quizzes
 WHERE ($1::uuid IS NULL OR owner_id = $1)
-  AND ($2::text IS NULL OR status = $2)
-  AND ($3::text IS NULL OR game_type = $3)
-  AND ($4::text IS NULL OR title ILIKE '%' || $4 || '%' OR description ILIKE '%' || $4 || '%')
+  AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
+  AND (cardinality($3::text[]) = 0 OR game_type = ANY($3::text[]))
+  AND (cardinality($4::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY($4::text[])
+      ))
+  AND ($5::text IS NULL OR title ILIKE '%' || $5 || '%' OR description ILIKE '%' || $5 || '%')
 `
 
 type CountQuizzesParams struct {
-	OwnerID  pgtype.UUID
-	Status   *string
-	GameType *string
-	Search   *string
+	OwnerID    pgtype.UUID
+	Statuses   []string
+	GameTypes  []string
+	Categories []string
+	Search     *string
 }
 
 func (q *Queries) CountQuizzes(ctx context.Context, arg CountQuizzesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countQuizzes,
 		arg.OwnerID,
-		arg.Status,
-		arg.GameType,
+		arg.Statuses,
+		arg.GameTypes,
+		arg.Categories,
 		arg.Search,
 	)
 	var total int64
@@ -161,17 +172,22 @@ SELECT q.id, q.title, q.description, q.owner_id, q.game_type, q.created_at,
        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
 FROM quizzes q
 WHERE q.status = 'published'
-  AND ($1::text IS NULL OR q.game_type = $1)
-  AND ($2::text IS NULL OR q.title ILIKE '%' || $2 || '%' OR q.description ILIKE '%' || $2 || '%')
+  AND (cardinality($1::text[]) = 0 OR q.game_type = ANY($1::text[]))
+  AND (cardinality($2::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = q.id AND qq.category = ANY($2::text[])
+      ))
+  AND ($3::text IS NULL OR q.title ILIKE '%' || $3 || '%' OR q.description ILIKE '%' || $3 || '%')
 ORDER BY q.created_at DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListPublicGamesParams struct {
-	GameType  *string
-	Search    *string
-	RowOffset int32
-	RowLimit  int32
+	GameTypes  []string
+	Categories []string
+	Search     *string
+	RowOffset  int32
+	RowLimit   int32
 }
 
 type ListPublicGamesRow struct {
@@ -186,7 +202,8 @@ type ListPublicGamesRow struct {
 
 func (q *Queries) ListPublicGames(ctx context.Context, arg ListPublicGamesParams) ([]ListPublicGamesRow, error) {
 	rows, err := q.db.Query(ctx, listPublicGames,
-		arg.GameType,
+		arg.GameTypes,
+		arg.Categories,
 		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -221,20 +238,25 @@ const listQuizzes = `-- name: ListQuizzes :many
 SELECT id, title, description, owner_id, status, game_type, break_after_round, created_at, updated_at
 FROM quizzes
 WHERE ($1::uuid IS NULL OR owner_id = $1)
-  AND ($2::text IS NULL OR status = $2)
-  AND ($3::text IS NULL OR game_type = $3)
-  AND ($4::text IS NULL OR title ILIKE '%' || $4 || '%' OR description ILIKE '%' || $4 || '%')
+  AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
+  AND (cardinality($3::text[]) = 0 OR game_type = ANY($3::text[]))
+  AND (cardinality($4::text[]) = 0 OR EXISTS (
+        SELECT 1 FROM questions qq
+        WHERE qq.quiz_id = quizzes.id AND qq.category = ANY($4::text[])
+      ))
+  AND ($5::text IS NULL OR title ILIKE '%' || $5 || '%' OR description ILIKE '%' || $5 || '%')
 ORDER BY updated_at DESC, id DESC
-LIMIT $6 OFFSET $5
+LIMIT $7 OFFSET $6
 `
 
 type ListQuizzesParams struct {
-	OwnerID   pgtype.UUID
-	Status    *string
-	GameType  *string
-	Search    *string
-	RowOffset int32
-	RowLimit  int32
+	OwnerID    pgtype.UUID
+	Statuses   []string
+	GameTypes  []string
+	Categories []string
+	Search     *string
+	RowOffset  int32
+	RowLimit   int32
 }
 
 type ListQuizzesRow struct {
@@ -252,8 +274,9 @@ type ListQuizzesRow struct {
 func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]ListQuizzesRow, error) {
 	rows, err := q.db.Query(ctx, listQuizzes,
 		arg.OwnerID,
-		arg.Status,
-		arg.GameType,
+		arg.Statuses,
+		arg.GameTypes,
+		arg.Categories,
 		arg.Search,
 		arg.RowOffset,
 		arg.RowLimit,
