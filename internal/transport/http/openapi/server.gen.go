@@ -130,6 +130,7 @@ type PublicGame struct {
 	// - jeopardy — своя игра, категории как темы.
 	GameType       QuizGameType       `json:"game_type"`
 	Id             openapi_types.UUID `json:"id"`
+	OwnerId        openapi_types.UUID `json:"owner_id"`
 	QuestionsCount int                `json:"questions_count"`
 	Title          string             `json:"title"`
 }

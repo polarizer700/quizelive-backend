@@ -718,7 +718,7 @@ components:
           format: int64
     PublicGame:
       type: object
-      required: [id, title, description, game_type, questions_count, created_at]
+      required: [id, title, description, owner_id, game_type, questions_count, created_at]
       properties:
         id:
           type: string
@@ -727,6 +727,9 @@ components:
           type: string
         description:
           type: string
+        owner_id:
+          type: string
+          format: uuid
         game_type:
           $ref: "#/components/schemas/QuizGameType"
         questions_count:

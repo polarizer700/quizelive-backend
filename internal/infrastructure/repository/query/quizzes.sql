@@ -38,7 +38,7 @@ DELETE FROM quizzes
 WHERE id = $1;
 
 -- name: ListPublicGames :many
-SELECT q.id, q.title, q.description, q.game_type, q.created_at,
+SELECT q.id, q.title, q.description, q.owner_id, q.game_type, q.created_at,
        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
 FROM quizzes q
 WHERE q.status = 'published'

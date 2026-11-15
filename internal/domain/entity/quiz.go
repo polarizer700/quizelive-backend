@@ -58,6 +58,7 @@ type PublicGame struct {
 	ID             uuid.UUID
 	Title          string
 	Description    string
+	OwnerID        uuid.UUID
 	GameType       QuizGameType
 	QuestionsCount int
 	CreatedAt      time.Time

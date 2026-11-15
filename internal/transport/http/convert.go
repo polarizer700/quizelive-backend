@@ -54,6 +54,7 @@ func toPublicGame(game entity.PublicGame) openapi.PublicGame {
 		Id:             openapi_types.UUID(game.ID),
 		Title:          game.Title,
 		Description:    game.Description,
+		OwnerId:        openapi_types.UUID(game.OwnerID),
 		GameType:       openapi.QuizGameType(game.GameType),
 		QuestionsCount: game.QuestionsCount,
 		CreatedAt:      game.CreatedAt,

@@ -107,6 +107,7 @@ func (r *QuizRepository) ListPublic(ctx context.Context, page repository.Page) (
 			ID:             row.ID,
 			Title:          row.Title,
 			Description:    row.Description,
+			OwnerID:        row.OwnerID,
 			GameType:       entity.QuizGameType(row.GameType),
 			QuestionsCount: int(row.QuestionsCount),
 			CreatedAt:      timeFrom(row.CreatedAt),

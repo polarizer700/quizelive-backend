@@ -141,7 +141,7 @@ func (q *Queries) GetQuiz(ctx context.Context, id uuid.UUID) (GetQuizRow, error)
 }
 
 const listPublicGames = `-- name: ListPublicGames :many
-SELECT q.id, q.title, q.description, q.game_type, q.created_at,
+SELECT q.id, q.title, q.description, q.owner_id, q.game_type, q.created_at,
        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)::bigint AS questions_count
 FROM quizzes q
 WHERE q.status = 'published'
@@ -158,6 +158,7 @@ type ListPublicGamesRow struct {
 	ID             uuid.UUID
 	Title          string
 	Description    string
+	OwnerID        uuid.UUID
 	GameType       string
 	CreatedAt      pgtype.Timestamptz
 	QuestionsCount int64
@@ -176,6 +177,7 @@ func (q *Queries) ListPublicGames(ctx context.Context, arg ListPublicGamesParams
 			&i.ID,
 			&i.Title,
 			&i.Description,
+			&i.OwnerID,
 			&i.GameType,
 			&i.CreatedAt,
 			&i.QuestionsCount,
